@@ -1,0 +1,6 @@
+# Built app bundle
+/build/
+
+# Go
+*.test
+*.out
