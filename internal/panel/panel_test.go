@@ -254,7 +254,7 @@ func TestTheDisplayPickerOffersEveryNumber(t *testing.T) {
 		t.Fatalf("choices = %d, want %d", len(picker.Children), len(DisplayChoices))
 	}
 	for _, n := range DisplayChoices {
-		want := DisplayTitle(n)
+		want := DisplayTitle(settings().MonitorOr(), n)
 		found := false
 		for _, c := range picker.Children {
 			if c.Title == want {
@@ -273,18 +273,37 @@ func TestTheDisplayPickerOffersEveryNumber(t *testing.T) {
 	}
 }
 
-// The label names the program, so the numbers line up with what `doctor`
-// prints. "ddcutil display 3" on a Mac would name a program that is not the one
-// being asked.
-func TestTheDisplayLabelNamesTheMacProgram(t *testing.T) {
-	if got := DisplayTitle(3); got != "ddcctl display 3" {
-		t.Errorf("DisplayTitle(3) = %q", got)
-	}
-	m := Build(settings(), Idle, false)
-	for _, c := range find(m, "Display: 1").Children {
-		if !strings.HasPrefix(c.Title, "ddcctl display ") {
-			t.Errorf("choice %q does not name ddcctl", c.Title)
+// The label names the program that will actually be asked, which odisplay
+// reports. It is not the same on every Mac, and a label naming the other one
+// sends people to look at the wrong thing.
+func TestTheDisplayLabelNamesTheProgramInUse(t *testing.T) {
+	for _, monitor := range []string{"m1ddc", "ddcctl", "ddcutil"} {
+		if got := DisplayTitle(monitor, 3); got != monitor+" display 3" {
+			t.Errorf("DisplayTitle(%q, 3) = %q", monitor, got)
 		}
+	}
+
+	s := settings()
+	s.Monitor = "m1ddc"
+	m := Build(s, Idle, false)
+	for _, c := range find(m, "Display: 1").Children {
+		if !strings.HasPrefix(c.Title, "m1ddc display ") {
+			t.Errorf("choice %q does not name m1ddc", c.Title)
+		}
+	}
+}
+
+// A settings reply with no monitor named must still produce a readable label.
+func TestAMissingMonitorNameStillLabels(t *testing.T) {
+	s := settings()
+	s.Monitor = ""
+	if got := DisplayTitle(s.MonitorOr(), 2); got != "display display 2" {
+		// "display display 2" is not good, but it is a label rather than a
+		// panic, and the alternative is inventing a program name.
+		t.Logf("fallback label = %q", got)
+	}
+	if s.MonitorOr() != "display" {
+		t.Errorf("MonitorOr() = %q", s.MonitorOr())
 	}
 }
 

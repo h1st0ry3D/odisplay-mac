@@ -80,6 +80,16 @@ func (i Input) Label() string {
 	return i.Key
 }
 
+// MonitorOr is the program to name in a label, falling back to a neutral word
+// when odisplay did not say. A label that names nothing is worse than one that
+// names nothing in particular.
+func (s Settings) MonitorOr() string {
+	if s.Monitor != "" {
+		return s.Monitor
+	}
+	return "display"
+}
+
 // Settings is what `list --json` prints.
 type Settings struct {
 	Version int `json:"version"`
@@ -88,8 +98,13 @@ type Settings struct {
 	// do with platforms here, which is the point.
 	Display  int            `json:"display"`
 	Displays map[string]int `json:"displays"`
-	Inputs   []Input        `json:"inputs"`
-	Devices  []string       `json:"devices"`
+	// Monitor is the program that moves the display on this machine, named by
+	// odisplay so a label says which one is actually being asked. It is not the
+	// same on every Mac, and naming the wrong one is misleading rather than
+	// merely untidy.
+	Monitor string   `json:"monitor"`
+	Inputs  []Input  `json:"inputs"`
+	Devices []string `json:"devices"`
 }
 
 // Client is a handle on the odisplay program.

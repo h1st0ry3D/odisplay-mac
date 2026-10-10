@@ -89,13 +89,17 @@ var Hosts = []string{"0", "1", "2", "3"}
 // machine does not have is refused when it is used, and the switch reports it.
 var DisplayChoices = []int{1, 2, 3, 4}
 
-// DisplayTool is the program the picker labels name, so the numbers are
-// recognisable against what `doctor` prints.
-const DisplayTool = "ddcctl"
-
-// DisplayTitle is what the picker reads when collapsed.
-func DisplayTitle(number int) string {
-	return DisplayTool + " display " + strconv.Itoa(number)
+// DisplayTitle is what one choice in the picker reads.
+//
+// It names the program that will actually be asked, which odisplay reports,
+// because it is not the same on every Mac: an Apple Silicon machine uses m1ddc
+// and an Intel one ddcctl. A label naming the other one sends people to look at
+// the wrong thing, which has already happened once.
+func DisplayTitle(monitor string, number int) string {
+	if monitor == "" {
+		monitor = "display"
+	}
+	return monitor + " display " + strconv.Itoa(number)
 }
 
 // HostLabel is what a channel reads as in a menu.
@@ -261,7 +265,7 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 	}
 	for _, n := range DisplayChoices {
 		displayItem.Children = append(displayItem.Children, &Item{
-			Title:   DisplayTitle(n),
+			Title:   DisplayTitle(s.MonitorOr(), n),
 			Tooltip: "Switch this monitor, numbered " + strconv.Itoa(n) + " on this machine",
 			// The tick is on the number in force, so which one a switch will
 			// use is readable without making one. Same rule as the channels.

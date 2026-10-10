@@ -156,7 +156,7 @@ func (a *app) render() {
 
 	want := shape(keys, installed)
 	if !a.built || !sameShape(a.builtFor, want) {
-		a.rebuild(installed, settings.Inputs)
+		a.rebuild(installed, settings.Inputs, settings.MonitorOr())
 	}
 
 	a.mu.Lock()
@@ -264,7 +264,7 @@ func sameShape(a, b []string) bool {
 // appear, because the order of these calls is the order of the menu. Keeping
 // that readable matters more here than anywhere else in this program: it is the
 // part no test on another platform can reach.
-func (a *app) rebuild(installed bool, inputs []cli.Input) {
+func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string) {
 	for _, it := range a.all {
 		it.Remove()
 	}
@@ -312,7 +312,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input) {
 	a.displayChoice = map[int]*systray.MenuItem{}
 	for _, n := range panel.DisplayChoices {
 		c := a.displayIt.AddSubMenuItemCheckbox(
-			panel.DisplayTitle(n),
+			panel.DisplayTitle(monitor, n),
 			"Switch this monitor, numbered "+strconv.Itoa(n)+" on this machine", false)
 		a.displayChoice[n] = c
 		a.wire(c, panel.ActionSetDisplay, "", "", n)
@@ -388,7 +388,7 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 		log.Printf("setting the display to %d", display)
 		res := client.SetDisplay(ctx, display)
 		a.setStatus(panel.ForSetting(res,
-			"Switching "+panel.DisplayTitle(display)+" from now on."))
+			"Switching "+panel.DisplayTitle(settings.MonitorOr(), display)+" from now on."))
 
 	case panel.ActionReload:
 		log.Println("reloading settings")
