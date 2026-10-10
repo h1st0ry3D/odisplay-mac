@@ -30,14 +30,14 @@ Reload settings
 Quit
 ```
 
-The display picker under the inputs offers `ddcctl display 1` through `4` with a tick on the number
-in force, the same list and the same wording as the Omarchy panel's right-click menu. Picking one
+The display picker under the inputs offers `display 1` through `4` — labelled with whichever program
+this Mac actually uses, `m1ddc` or `ddcctl` — with a tick on the number in force. The same list and
+the same wording as the Omarchy panel's right-click menu. Picking one
 records it for **this machine only**, so it cannot change what a Linux box uses.
 
-The list is fixed rather than discovered because ddcctl cannot be asked for it: it takes a number
-that indexes the displays it can see, skipping the built-in one, and has no listing mode at all. A
-number this machine does not have is refused when it is used, and the switch says so rather than
-appearing to work.
+The list is fixed because `m1ddc` numbers external displays from 1 and skips the built-in one, and
+that numbering is stable enough to offer. A number this machine does not have is refused when it is
+used, and the switch says so rather than appearing to work.
 
 One block per input. The input's own name is the top item, and clicking it switches. The line
 under it opens the Easy-Switch channels, with a tick on the one that is in force, so you can see
@@ -64,7 +64,8 @@ that input is switched to.
 | | What | Why | Required |
 |---|---|---|---|
 | CLI | [`odisplay`](https://github.com/h1st0ry3D/odisplay-cli) | Does the switch, and owns the order it happens in | **Yes** |
-| macOS | [`ddcctl`](https://github.com/kfix/ddcctl) | Moves the monitor, on a connection that supports DDC | **Yes** |
+| macOS (Apple Silicon) | [`m1ddc`](https://github.com/waydabber/m1ddc) | Moves the monitor | **Yes** |
+| macOS (Intel) | [`ddcctl`](https://github.com/kfix/ddcctl) | Moves the monitor | **Yes** |
 | macOS | [`mxswitch`](https://github.com/marcocosta97/mxswitch) | Moves the keyboard and mouse | Only for the Easy-Switch channels |
 | Build | Go 1.22 or newer | Building both of the above | To build |
 
@@ -74,15 +75,20 @@ the devices did not move rather than pretending.
 You do not have to grant it to use the display half. Set every input's channel to `off` and the
 monitor still switches, with no HID access and no prompt.
 
-**Check the Mac's connection before you build any of this.** DDC/CI only works on some ports on
-Apple Silicon, and if yours does not, nothing above will move the monitor. See
+**Check the display moves before you build any of this.** `odisplay doctor` lists the displays and
+the number to use. If it reports that the monitor did not answer, see
 [If the monitor does not switch](#if-the-monitor-does-not-switch).
 
 ### 1. The programs it drives
 
 ```sh
-brew install ddcctl
+brew install m1ddc          # Apple Silicon, which is every Mac since 2020
+# brew install ddcctl       # Intel only
 ```
+
+**On Apple Silicon use `m1ddc`.** `ddcctl` does not work there — it has an open issue from the M1
+launch asking for it, its last commit is from November 2022, and its DDC calls report success while
+changing nothing. `odisplay` prefers `m1ddc` when both are installed.
 
 And, for the keyboard and mouse, [mxswitch](https://github.com/marcocosta97/mxswitch), which sends
 the HID++ ChangeHost command itself so Logi Options+ does not have to be running:
