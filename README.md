@@ -43,9 +43,40 @@ that input is switched to.
 
 ## Install
 
-### 1. odisplay-cli
+### What you need first
 
-This is required. Without it the app starts and says so, listing where it looked.
+| | What | Why | Required |
+|---|---|---|---|
+| CLI | [`odisplay`](https://github.com/h1st0ry3D/odisplay-cli) | Does the switch, and owns the order it happens in | **Yes** |
+| macOS | [`ddcctl`](https://github.com/kfix/ddcctl) | Moves the monitor, on a connection that supports DDC | **Yes** |
+| macOS | [`mxswitch`](https://github.com/marcocosta97/mxswitch) | Moves the keyboard and mouse | Only for the Easy-Switch channels |
+| Build | Go 1.22 or newer | Building both of the above | To build |
+
+Nothing here needs `sudo`. Without Input Monitoring the monitor still switches, and the app says
+the devices did not move rather than pretending.
+
+**Check the Mac's connection before you build any of this.** DDC/CI only works on some ports on
+Apple Silicon, and if yours does not, nothing above will move the monitor. See
+[If the monitor does not switch](#if-the-monitor-does-not-switch).
+
+### 1. The programs it drives
+
+```sh
+brew install ddcctl
+```
+
+And, for the keyboard and mouse, [mxswitch](https://github.com/marcocosta97/mxswitch), which sends
+the HID++ ChangeHost command itself so Logi Options+ does not have to be running:
+
+```sh
+git clone https://github.com/marcocosta97/mxswitch
+cd mxswitch && make && make install PREFIX="$HOME/.local"
+```
+
+`brew` puts ddcctl in `/opt/homebrew/bin` on Apple Silicon and `/usr/local/bin` on Intel. Both are
+looked for, so it does not matter which you have.
+
+### 2. odisplay-cli
 
 ```sh
 git clone https://github.com/h1st0ry3D/odisplay-cli
@@ -53,14 +84,22 @@ cd odisplay-cli
 go build -trimpath -o ~/.local/bin/odisplay ./cmd/odisplay
 ```
 
-And the programs it drives:
+`/usr/local/bin` works too, though that needs `sudo`. The app looks in `/usr/local/bin` first,
+`~/.local/bin` second, then `/opt/homebrew/bin`.
+
+### 3. Check before you trust it
+
+This moves nothing:
 
 ```sh
-brew install ddcctl                                        # the monitor
-git clone https://github.com/marcocosta97/mxswitch && cd mxswitch && make && make install PREFIX="$HOME/.local"
+odisplay doctor
 ```
 
-### 2. This app
+It reports whether the programs are installed and whether the display number in the settings is one
+this machine actually has. **Read it before the first switch** — a display number this Mac will not
+accept makes every switch a silent no-op while the keyboard and mouse still move.
+
+### 4. This app
 
 ```sh
 git clone https://github.com/h1st0ry3D/odisplay-bar
@@ -68,19 +107,75 @@ cd odisplay-bar
 ./build/build.sh
 ```
 
-That produces `build/OdisplayBar.app`. Move it to `/Applications` and open it.
+That runs the tests first, then builds `build/OdisplayBar.app`.
 
-A bundle rather than a bare binary, because macOS gives a menu bar app a Dock icon and no stable
-identity without one, and TCC permissions are granted per bundle.
+It is a bundle rather than a bare binary on purpose: macOS gives a menu bar app a Dock icon and no
+stable identity without one, and permissions are granted per bundle.
 
-### 3. Permissions
+```sh
+mv build/OdisplayBar.app /Applications/
+open /Applications/OdisplayBar.app
+```
+
+The icon appears in the menu bar. Click it for the menu.
+
+### 5. Permissions
 
 Moving the keyboard and mouse sends HID reports, which macOS gates behind **Input Monitoring**.
-If it does not move, grant it to Odisplay in System Settings → Privacy & Security → Input
-Monitoring.
 
-Keep the `codesign -s -` in the build script. macOS identifies an unsigned binary by path *and*
-code hash, so an unsigned rebuild silently loses the permission it had.
+If a switch moves the monitor but the devices do not, grant it in System Settings → Privacy &
+Security → Input Monitoring, adding Odisplay if it is not already listed. Restart the app after.
+
+> Keep the `codesign --sign -` in `build/build.sh`. macOS identifies an unsigned binary by path
+> *and* code hash, so an unsigned rebuild silently loses a permission it already had. If you build
+> your own, do not drop that step.
+
+### If the monitor does not switch
+
+This is a macOS limitation, not a bug in the app, and it is worth knowing before you spend an
+evening on it.
+
+**DDC/CI on Apple Silicon only works on some connections.** macOS reaches a monitor over private
+IOKit interfaces that differ by port, and the pattern people report is:
+
+- Thunderbolt and USB-C generally work.
+- A **built-in HDMI port on an M-series Mac often does not**, and neither does some USB-C to HDMI
+  adapter.
+- Intel Macs are less fussy.
+
+So if `odisplay doctor` reports the programs present and the display number is right, but the
+monitor never moves, test the connection before anything else:
+
+```sh
+ddcctl -m          # does ddcctl see the monitor at all?
+```
+
+If that lists nothing, it is the connection. Moving the Mac to a Thunderbolt or USB-C cable is the
+usual fix. Nothing in this app or the CLI can work around it, because there is no I2C channel to
+talk to.
+
+A switch that cannot move the monitor exits 2 and **leaves the keyboard and mouse alone**, so this
+fails safely: you keep your input.
+
+### Uninstall
+
+```sh
+rm -rf /Applications/OdisplayBar.app
+rm ~/.local/bin/odisplay                       # if you want the CLI gone too
+```
+
+Your settings live in `~/.config/odisplay/odisplay.json` and are shared with the CLI, so they
+survive. Delete that too if you want them gone.
+
+### Updating
+
+```sh
+cd ~/github/odisplay-bar && git pull && ./build/build.sh
+mv build/OdisplayBar.app /Applications/
+```
+
+Rebuilding replaces the app, so re-check Input Monitoring afterwards if a switch stops moving the
+devices.
 
 ## Settings
 
