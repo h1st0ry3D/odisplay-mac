@@ -167,6 +167,10 @@ func oneLine(s string) string {
 //
 // It says where it looked, because "nothing happens when I click" is the worst
 // thing a menu bar app can do and this is the one case that causes it.
+//
+// This is the one menu that keeps a Reload: with nothing driving it there is
+// nothing that re-reads on its own, so installing odisplay while this is open
+// would otherwise need the app restarting.
 func NotInstalled(where []string) *Model {
 	m := &Model{
 		Status: Status{
@@ -277,14 +281,6 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 	}
 	displayItem.Title = displayItem.Title + ": " + strconv.Itoa(s.Display)
 	m.Items = append(m.Items, displayItem)
-
-	m.Items = append(m.Items, &Item{
-		Title:           "Reload settings",
-		Tooltip:         "Re-read the settings file, for after a hand edit",
-		SeparatorBefore: true,
-		Action:          ActionReload,
-		Disabled:        busy,
-	})
 
 	m.Items = append(m.Items, &Item{
 		Title:    "Quit",

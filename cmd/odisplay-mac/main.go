@@ -177,9 +177,6 @@ func (a *app) render() {
 		a.statusIt.SetTitle(model.Status.Text)
 		a.statusIt.SetTooltip(model.Status.Text)
 	}
-	if a.reloadIt != nil {
-		setEnabled(a.reloadIt, !busy)
-	}
 
 	if a.displayIt != nil {
 		a.displayIt.SetTitle("Display: " + strconv.Itoa(settings.Display))
@@ -317,10 +314,6 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string) {
 		a.displayChoice[n] = c
 		a.wire(c, panel.ActionSetDisplay, "", "", n)
 	}
-
-	a.reloadIt = keep(systray.AddMenuItem("Reload settings",
-		"Re-read the settings, for after a hand edit"))
-	a.wire(a.reloadIt, panel.ActionReload, "", "", 0)
 
 	a.quitIt = keep(systray.AddMenuItem("Quit",
 		"Leave Odisplay. Nothing is switched on the way out."))

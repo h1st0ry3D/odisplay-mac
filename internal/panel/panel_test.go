@@ -226,16 +226,16 @@ func TestSeparatorsFallBetweenInputs(t *testing.T) {
 			seps++
 		}
 	}
-	// One per input, plus one before the display picker and one before Reload.
-	// Not one per item, which would be a wall of lines.
-	if seps != 5 {
-		t.Errorf("separators = %d, want 5 (one per input, one before Display, one before Reload)", seps)
+	// One per input, plus one before the display picker. Not one per item,
+	// which would be a wall of lines.
+	if seps != 4 {
+		t.Errorf("separators = %d, want 4 (one per input, one before Display)", seps)
 	}
 }
 
 func TestTheDescriptionRendersTheWholeMenu(t *testing.T) {
 	out := Build(settings(), Idle, false).Describe()
-	for _, want := range []string{"X", "Mac Mini", "PC", "[x] 3", "Reload settings", "Quit"} {
+	for _, want := range []string{"X", "Mac Mini", "PC", "[x] 3", "Quit"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("description is missing %q:\n%s", want, out)
 		}
@@ -342,5 +342,32 @@ func TestThePickerIsDisabledWhileBusy(t *testing.T) {
 		if !c.Disabled {
 			t.Errorf("%q is clickable while busy", c.Title)
 		}
+	}
+}
+
+// The settings are re-read after everything this menu can do, so a Reload
+// alongside them is a button that does nothing a click would not have already
+// done. The one menu that keeps it is the one with nothing driving it.
+func TestTheNormalMenuHasNoReload(t *testing.T) {
+	m := Build(settings(), Idle, false)
+	for _, it := range m.Items {
+		if strings.Contains(it.Title, "Reload") {
+			t.Errorf("the menu still offers %q", it.Title)
+		}
+	}
+}
+
+// With nothing driving it, nothing re-reads on its own, so installing odisplay
+// while this is open would otherwise need the app restarting.
+func TestTheNotInstalledMenuKeepsAReload(t *testing.T) {
+	m := NotInstalled([]string{"/usr/local/bin/odisplay"})
+	found := false
+	for _, it := range m.Items {
+		if it.Action == ActionReload {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no way to look again without restarting:\n%s", m.Describe())
 	}
 }
