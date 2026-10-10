@@ -55,6 +55,9 @@ that input is switched to.
 Nothing here needs `sudo`. Without Input Monitoring the monitor still switches, and the app says
 the devices did not move rather than pretending.
 
+You do not have to grant it to use the display half. Set every input's channel to `off` and the
+monitor still switches, with no HID access and no prompt.
+
 **Check the Mac's connection before you build any of this.** DDC/CI only works on some ports on
 Apple Silicon, and if yours does not, nothing above will move the monitor. See
 [If the monitor does not switch](#if-the-monitor-does-not-switch).
@@ -120,6 +123,14 @@ open /Applications/OdisplayMac.app
 The icon appears in the menu bar. Click it for the menu.
 
 ### 5. Permissions
+
+**Only `mxswitch` needs Input Monitoring, not `ddcctl`.** `ddcctl` talks I2C to the display and
+never opens a HID device. Inside this app `mxswitch` is a child process, so the grant goes to
+whichever binary opens the device.
+
+[`SECURITY.md`](SECURITY.md) is a read of both programs' source: what each one needs, exactly what
+`mxswitch` sends, and the two shell calls it makes. Worth five minutes before granting a permission
+that can read keystrokes.
 
 Moving the keyboard and mouse sends HID reports, which macOS gates behind **Input Monitoring**.
 
