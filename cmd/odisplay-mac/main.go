@@ -24,6 +24,7 @@ import (
 	"fyne.io/systray"
 
 	"github.com/h1st0ry3D/odisplay-mac/internal/cli"
+	"github.com/h1st0ry3D/odisplay-mac/internal/icon"
 	"github.com/h1st0ry3D/odisplay-mac/internal/panel"
 )
 
@@ -69,7 +70,16 @@ type app struct {
 var state = &app{status: panel.Idle}
 
 func onReady() {
-	systray.SetTitle("Odisplay")
+	// The glyph, not the word. systray draws only the image when the title is
+	// empty, so this is the Omarchy bar's own fa-tv in the menu bar rather than
+	// a name next to it.
+	//
+	// It is handed over as a template image: black with an alpha channel, which
+	// macOS inverts for a dark menu bar and leaves alone for a light one. The
+	// same bytes go in both arguments because on macOS only the first is used,
+	// and the second is what other platforms would draw.
+	systray.SetTemplateIcon(icon.TV(), icon.TV())
+	systray.SetTitle("")
 	systray.SetTooltip("Odisplay — switch the monitor and the keyboard and mouse")
 
 	state.reload()

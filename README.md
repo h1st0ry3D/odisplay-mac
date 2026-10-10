@@ -7,6 +7,12 @@ same one the [Omarchy panel](https://github.com/h1st0ry3D/odisplay) uses.
 
 ## What it does
 
+The menu bar shows the same fa-tv glyph the Omarchy panel puts in its bar, so the two front ends
+are recognisably the same thing. It is a rendered image rather than the character: the menu bar
+draws text in the system font, where a private-use codepoint is an empty box. It is handed over as
+a *template image* — black with an alpha channel — so macOS inverts it for a dark menu bar and
+leaves it alone for a light one, with no second file.
+
 ```
 Odisplay
 ──────────────────────────
