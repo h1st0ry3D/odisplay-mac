@@ -14,7 +14,6 @@ a *template image* — black with an alpha channel — so macOS inverts it for a
 leaves it alone for a light one, with no second file.
 
 ```
-Odisplay
 ──────────────────────────
 Sent Mac Mini, devices on host 3.
 ──────────────────────────
@@ -25,9 +24,20 @@ Mac Mini
 PC
   Keyboard and mouse: off  ▸
 ──────────────────────────
+Display: 1                 ▸
+──────────────────────────
 Reload settings
 Quit
 ```
+
+The display picker under the inputs offers `ddcctl display 1` through `4` with a tick on the number
+in force, the same list and the same wording as the Omarchy panel's right-click menu. Picking one
+records it for **this machine only**, so it cannot change what a Linux box uses.
+
+The list is fixed rather than discovered because ddcctl cannot be asked for it: it takes a number
+that indexes the displays it can see, skipping the built-in one, and has no listing mode at all. A
+number this machine does not have is refused when it is used, and the switch says so rather than
+appearing to work.
 
 One block per input. The input's own name is the top item, and clicking it switches. The line
 under it opens the Easy-Switch channels, with a tick on the one that is in force, so you can see

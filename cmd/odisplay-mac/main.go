@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"log"
+	"strconv"
 	"sync"
 
 	"fyne.io/systray"
@@ -60,8 +61,12 @@ type app struct {
 	builtFor []string
 	statusIt *systray.MenuItem
 	rows     []*row
-	reloadIt *systray.MenuItem
-	quitIt   *systray.MenuItem
+	// displayIt is the picker and its choices, kept so the tick can move and
+	// the title can name the number in force.
+	displayIt     *systray.MenuItem
+	displayChoice map[int]*systray.MenuItem
+	reloadIt      *systray.MenuItem
+	quitIt        *systray.MenuItem
 	// all is every item on screen, in the order it appears, so a rebuild can
 	// take the whole menu down before putting a new one up.
 	all []*systray.MenuItem
@@ -176,6 +181,19 @@ func (a *app) render() {
 		setEnabled(a.reloadIt, !busy)
 	}
 
+	if a.displayIt != nil {
+		a.displayIt.SetTitle("Display: " + strconv.Itoa(settings.Display))
+		setEnabled(a.displayIt, !busy)
+		for n, item := range a.displayChoice {
+			if n == settings.Display {
+				item.Check()
+			} else {
+				item.Uncheck()
+			}
+			setEnabled(item, !busy)
+		}
+	}
+
 	for _, r := range a.rows {
 		host := "0"
 		label := r.key
@@ -273,7 +291,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input) {
 			r := &row{key: in.Key, choice: map[string]*systray.MenuItem{}}
 			r.label = keep(systray.AddMenuItem(in.Label(),
 				"Switch the monitor to "+in.Label()))
-			a.wire(r.label, panel.ActionSwitch, in.Key, "")
+			a.wire(r.label, panel.ActionSwitch, in.Key, "", 0)
 
 			r.host = keep(systray.AddMenuItem(
 				"Keyboard and mouse: "+panel.HostLabel(in.HostChannel()),
@@ -282,7 +300,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input) {
 				c := r.host.AddSubMenuItemCheckbox(
 					panel.HostLabel(h), panel.HostMeaning(h), false)
 				r.choice[h] = c
-				a.wire(c, panel.ActionSetHost, in.Key, h)
+				a.wire(c, panel.ActionSetHost, in.Key, h, 0)
 			}
 			a.rows = append(a.rows, r)
 		}
@@ -290,9 +308,19 @@ func (a *app) rebuild(installed bool, inputs []cli.Input) {
 
 	keep(a.addLabel(""))
 
+	a.displayIt = keep(systray.AddMenuItem("Display", "Which display this machine switches"))
+	a.displayChoice = map[int]*systray.MenuItem{}
+	for _, n := range panel.DisplayChoices {
+		c := a.displayIt.AddSubMenuItemCheckbox(
+			panel.DisplayTitle(n),
+			"Switch this monitor, numbered "+strconv.Itoa(n)+" on this machine", false)
+		a.displayChoice[n] = c
+		a.wire(c, panel.ActionSetDisplay, "", "", n)
+	}
+
 	a.reloadIt = keep(systray.AddMenuItem("Reload settings",
 		"Re-read the settings, for after a hand edit"))
-	a.wire(a.reloadIt, panel.ActionReload, "", "")
+	a.wire(a.reloadIt, panel.ActionReload, "", "", 0)
 
 	a.quitIt = keep(systray.AddMenuItem("Quit",
 		"Leave Odisplay. Nothing is switched on the way out."))
@@ -308,10 +336,10 @@ func (a *app) rebuild(installed bool, inputs []cli.Input) {
 }
 
 // wire sends every click on an item to run.
-func (a *app) wire(item *systray.MenuItem, action panel.Action, key, host string) {
+func (a *app) wire(item *systray.MenuItem, action panel.Action, key, host string, display int) {
 	go func() {
 		for range item.ClickedCh {
-			a.run(action, key, host)
+			a.run(action, key, host, display)
 		}
 	}()
 }
@@ -329,7 +357,7 @@ func (a *app) addLabel(title string) *systray.MenuItem {
 // busy is what keeps two switches from overlapping. On a keyboard and mouse an
 // interleaved pair leaves one machine with the pointer and the other with
 // nothing.
-func (a *app) run(action panel.Action, key, host string) {
+func (a *app) run(action panel.Action, key, host string, display int) {
 	a.mu.Lock()
 	if a.busy || a.client == nil {
 		a.mu.Unlock()
@@ -355,6 +383,12 @@ func (a *app) run(action panel.Action, key, host string) {
 		res := client.SetHost(ctx, key, host)
 		a.setStatus(panel.ForSetting(res,
 			"Keyboard and mouse for "+label+" set to "+panel.HostLabel(host)+"."))
+
+	case panel.ActionSetDisplay:
+		log.Printf("setting the display to %d", display)
+		res := client.SetDisplay(ctx, display)
+		a.setStatus(panel.ForSetting(res,
+			"Switching "+panel.DisplayTitle(display)+" from now on."))
 
 	case panel.ActionReload:
 		log.Println("reloading settings")

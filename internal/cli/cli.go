@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -289,6 +290,16 @@ func (c *Client) Switch(ctx context.Context, key string) Result {
 // SetHost sets an input's Easy-Switch channel.
 func (c *Client) SetHost(ctx context.Context, key, host string) Result {
 	res, _ := c.run(ctx, "set", "host", key, host)
+	return res
+}
+
+// SetDisplay records which display this machine should switch, by the number
+// the monitor program uses here.
+//
+// Only this machine's entry is written: odisplay keeps one number per platform,
+// so setting it on a Mac cannot change what a Linux box uses.
+func (c *Client) SetDisplay(ctx context.Context, number int) Result {
+	res, _ := c.run(ctx, "set", "display", strconv.Itoa(number))
 	return res
 }
 

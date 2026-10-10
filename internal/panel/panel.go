@@ -13,6 +13,7 @@ package panel
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/h1st0ry3D/odisplay-mac/internal/cli"
@@ -30,6 +31,9 @@ const (
 	// ActionSetHost records a channel. It only writes the setting; nothing
 	// moves until that input is switched to.
 	ActionSetHost
+	// ActionSetDisplay records which display this machine switches. It only
+	// writes the setting; nothing moves until an input is switched to.
+	ActionSetDisplay
 	// ActionReload re-reads the settings, for after a hand edit.
 	ActionReload
 	// ActionQuit leaves.
@@ -59,6 +63,8 @@ type Item struct {
 	Key string
 	// Host is the channel an ActionSetHost will write.
 	Host string
+	// Display is the number an ActionSetDisplay will write.
+	Display int
 }
 
 // Status is the line at the top, which reports the last switch.
@@ -74,6 +80,23 @@ type Status struct {
 // Hosts are the Easy-Switch channels a menu offers. "0" is off, which is a real
 // choice and not the absence of one, so it is listed first like any other.
 var Hosts = []string{"0", "1", "2", "3"}
+
+// DisplayChoices are the display numbers the picker offers.
+//
+// Fixed rather than discovered, the same as the Omarchy panel's, because
+// neither program can be asked for its list reliably: ddcutil only numbers the
+// displays it accepts, and ddcctl has no listing mode at all. A number the
+// machine does not have is refused when it is used, and the switch reports it.
+var DisplayChoices = []int{1, 2, 3, 4}
+
+// DisplayTool is the program the picker labels name, so the numbers are
+// recognisable against what `doctor` prints.
+const DisplayTool = "ddcctl"
+
+// DisplayTitle is what the picker reads when collapsed.
+func DisplayTitle(number int) string {
+	return DisplayTool + " display " + strconv.Itoa(number)
+}
 
 // HostLabel is what a channel reads as in a menu.
 func HostLabel(host string) string {
@@ -161,6 +184,7 @@ func NotInstalled(where []string) *Model {
 			SeparatorBefore: len(m.Items) == 1,
 		})
 	}
+
 	m.Items = append(m.Items, &Item{
 		Title:           "Reload settings",
 		Tooltip:         "Look again, after putting it there",
@@ -227,6 +251,28 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 		}
 		m.Items = append(m.Items, hostItem)
 	}
+
+	displayItem := &Item{
+		Title:           "Display",
+		Tooltip:         "Which display this machine switches",
+		Action:          ActionNone,
+		Disabled:        busy,
+		SeparatorBefore: true,
+	}
+	for _, n := range DisplayChoices {
+		displayItem.Children = append(displayItem.Children, &Item{
+			Title:   DisplayTitle(n),
+			Tooltip: "Switch this monitor, numbered " + strconv.Itoa(n) + " on this machine",
+			// The tick is on the number in force, so which one a switch will
+			// use is readable without making one. Same rule as the channels.
+			Checked:  n == s.Display,
+			Action:   ActionSetDisplay,
+			Display:  n,
+			Disabled: busy,
+		})
+	}
+	displayItem.Title = displayItem.Title + ": " + strconv.Itoa(s.Display)
+	m.Items = append(m.Items, displayItem)
 
 	m.Items = append(m.Items, &Item{
 		Title:           "Reload settings",

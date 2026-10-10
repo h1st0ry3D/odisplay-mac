@@ -454,3 +454,30 @@ func TestAClientWithNoPathFailsRatherThanDoingNothing(t *testing.T) {
 		t.Error("a client with no path should fail rather than silently do nothing")
 	}
 }
+
+func TestSettingTheDisplayWritesAndReadsBack(t *testing.T) {
+	c := scratch(t, oneInput)
+	if res := c.SetDisplay(context.Background(), 3); res.Code != 0 {
+		t.Fatalf("set display failed: %d %s %s", res.Code, res.Message, res.Detail)
+	}
+	s, err := c.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Display != 3 {
+		t.Errorf("display = %d, want 3", s.Display)
+	}
+}
+
+// The picker offers 1 to 4. A number outside it must be refused by odisplay
+// rather than written and used.
+func TestSettingAnImpossibleDisplayIsRefused(t *testing.T) {
+	c := scratch(t, oneInput)
+	if res := c.SetDisplay(context.Background(), 0); res.Code == 0 {
+		t.Error("display 0 was accepted")
+	}
+	s, _ := c.List(context.Background())
+	if s.Display != 1 {
+		t.Errorf("display = %d, want it left at 1", s.Display)
+	}
+}

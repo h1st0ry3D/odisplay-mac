@@ -226,9 +226,10 @@ func TestSeparatorsFallBetweenInputs(t *testing.T) {
 			seps++
 		}
 	}
-	// One per input, plus one before Reload. Not one per item.
-	if seps != 4 {
-		t.Errorf("separators = %d, want 4 (one per input, one before Reload)", seps)
+	// One per input, plus one before the display picker and one before Reload.
+	// Not one per item, which would be a wall of lines.
+	if seps != 5 {
+		t.Errorf("separators = %d, want 5 (one per input, one before Display, one before Reload)", seps)
 	}
 }
 
@@ -237,6 +238,90 @@ func TestTheDescriptionRendersTheWholeMenu(t *testing.T) {
 	for _, want := range []string{"X", "Mac Mini", "PC", "[x] 3", "Reload settings", "Quit"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("description is missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// The picker has to offer the same numbers as the Omarchy panel, and mark the
+// one in force, or which display a switch will use is a guess.
+func TestTheDisplayPickerOffersEveryNumber(t *testing.T) {
+	m := Build(settings(), Idle, false)
+	picker := find(m, "Display: 1")
+	if picker == nil {
+		t.Fatalf("no display picker:\n%s", m.Describe())
+	}
+	if len(picker.Children) != len(DisplayChoices) {
+		t.Fatalf("choices = %d, want %d", len(picker.Children), len(DisplayChoices))
+	}
+	for _, n := range DisplayChoices {
+		want := DisplayTitle(n)
+		found := false
+		for _, c := range picker.Children {
+			if c.Title == want {
+				found = true
+				if c.Action != ActionSetDisplay {
+					t.Errorf("%q has action %v", c.Title, c.Action)
+				}
+				if c.Display != n {
+					t.Errorf("%q carries %d", c.Title, c.Display)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("no choice for %q", want)
+		}
+	}
+}
+
+// The label names the program, so the numbers line up with what `doctor`
+// prints. "ddcutil display 3" on a Mac would name a program that is not the one
+// being asked.
+func TestTheDisplayLabelNamesTheMacProgram(t *testing.T) {
+	if got := DisplayTitle(3); got != "ddcctl display 3" {
+		t.Errorf("DisplayTitle(3) = %q", got)
+	}
+	m := Build(settings(), Idle, false)
+	for _, c := range find(m, "Display: 1").Children {
+		if !strings.HasPrefix(c.Title, "ddcctl display ") {
+			t.Errorf("choice %q does not name ddcctl", c.Title)
+		}
+	}
+}
+
+func TestTheTickIsOnTheDisplayInForce(t *testing.T) {
+	s := settings()
+	s.Display = 3
+	picker := find(Build(s, Idle, false), "Display: 3")
+	if picker == nil {
+		t.Fatal("the title does not name the display in force")
+	}
+	ticked := 0
+	for _, c := range picker.Children {
+		if c.Checked {
+			ticked++
+			if c.Display != 3 {
+				t.Errorf("ticked %d, want 3", c.Display)
+			}
+		}
+	}
+	if ticked != 1 {
+		t.Errorf("ticked %d choices, want exactly 1", ticked)
+	}
+}
+
+// A switch in flight disables the picker too, so the number cannot be changed
+// underneath the switch that is using it.
+func TestThePickerIsDisabledWhileBusy(t *testing.T) {
+	picker := find(Build(settings(), Idle, true), "Display: 1")
+	if picker == nil {
+		t.Fatal("no picker")
+	}
+	if !picker.Disabled {
+		t.Error("the picker is clickable while busy")
+	}
+	for _, c := range picker.Children {
+		if !c.Disabled {
+			t.Errorf("%q is clickable while busy", c.Title)
 		}
 	}
 }
