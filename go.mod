@@ -1,4 +1,4 @@
-module github.com/h1st0ry3D/odisplay-bar
+module github.com/h1st0ry3D/odisplay-mac
 
 go 1.22
 

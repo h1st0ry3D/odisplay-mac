@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/h1st0ry3D/odisplay-bar/internal/cli"
-	"github.com/h1st0ry3D/odisplay-bar/internal/panel"
+	"github.com/h1st0ry3D/odisplay-mac/internal/cli"
+	"github.com/h1st0ry3D/odisplay-mac/internal/panel"
 )
 
 func main() {

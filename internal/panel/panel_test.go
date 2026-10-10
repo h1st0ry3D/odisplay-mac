@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/h1st0ry3D/odisplay-bar/internal/cli"
+	"github.com/h1st0ry3D/odisplay-mac/internal/cli"
 )
 
 func settings() cli.Settings {

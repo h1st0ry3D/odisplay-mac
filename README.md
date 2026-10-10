@@ -1,4 +1,4 @@
-# odisplay-bar
+# odisplay-mac
 
 A menu bar app for macOS. Switch the monitor, and take the Logitech keyboard and mouse with you.
 
@@ -102,19 +102,19 @@ accept makes every switch a silent no-op while the keyboard and mouse still move
 ### 4. This app
 
 ```sh
-git clone https://github.com/h1st0ry3D/odisplay-bar
-cd odisplay-bar
+git clone https://github.com/h1st0ry3D/odisplay-mac
+cd odisplay-mac
 ./build/build.sh
 ```
 
-That runs the tests first, then builds `build/OdisplayBar.app`.
+That runs the tests first, then builds `build/OdisplayMac.app`.
 
 It is a bundle rather than a bare binary on purpose: macOS gives a menu bar app a Dock icon and no
 stable identity without one, and permissions are granted per bundle.
 
 ```sh
-mv build/OdisplayBar.app /Applications/
-open /Applications/OdisplayBar.app
+mv build/OdisplayMac.app /Applications/
+open /Applications/OdisplayMac.app
 ```
 
 The icon appears in the menu bar. Click it for the menu.
@@ -160,7 +160,7 @@ fails safely: you keep your input.
 ### Uninstall
 
 ```sh
-rm -rf /Applications/OdisplayBar.app
+rm -rf /Applications/OdisplayMac.app
 rm ~/.local/bin/odisplay                       # if you want the CLI gone too
 ```
 
@@ -170,8 +170,8 @@ survive. Delete that too if you want them gone.
 ### Updating
 
 ```sh
-cd ~/github/odisplay-bar && git pull && ./build/build.sh
-mv build/OdisplayBar.app /Applications/
+cd ~/github/odisplay-mac && git pull && ./build/build.sh
+mv build/OdisplayMac.app /Applications/
 ```
 
 Rebuilding replaces the app, so re-check Input Monitoring afterwards if a switch stops moving the
@@ -212,7 +212,7 @@ Everything below was tested here, on Linux, against the real `odisplay` binary:
 - `internal/` type-checks with `GOOS=darwin`.
 
 What is unverified is the drawing: about 200 lines of systray calls in
-`cmd/odisplay-bar/main.go`, and the `.app` bundle. The first build on a Mac is the first real test
+`cmd/odisplay-mac/main.go`, and the `.app` bundle. The first build on a Mac is the first real test
 of that.
 
 ### One difference from the Omarchy panel

@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/h1st0ry3D/odisplay-bar/internal/cli"
+	"github.com/h1st0ry3D/odisplay-mac/internal/cli"
 )
 
 // Action is what an item does when it is clicked.

@@ -1,4 +1,4 @@
-// Command odisplay-bar puts a monitor input switcher in the macOS menu bar.
+// Command odisplay-mac puts a monitor input switcher in the macOS menu bar.
 //
 // It is a front end. Everything that matters happens in odisplay: which
 // commands run, and in what order. This program decides how to draw a list and
@@ -17,13 +17,13 @@ import (
 
 	"fyne.io/systray"
 
-	"github.com/h1st0ry3D/odisplay-bar/internal/cli"
-	"github.com/h1st0ry3D/odisplay-bar/internal/panel"
+	"github.com/h1st0ry3D/odisplay-mac/internal/cli"
+	"github.com/h1st0ry3D/odisplay-mac/internal/panel"
 )
 
 func main() {
 	log.SetFlags(0)
-	log.SetPrefix("odisplay-bar: ")
+	log.SetPrefix("odisplay-mac: ")
 	systray.Run(onReady, func() {})
 }
 
@@ -47,7 +47,7 @@ func onReady() {
 	systray.SetTitle("Odisplay")
 	systray.SetTooltip("Odisplay — switch the monitor and the keyboard and mouse")
 
-	quit := systray.AddMenuItem("Quit", "Leave odisplay-bar")
+	quit := systray.AddMenuItem("Quit", "Leave odisplay-mac")
 	go func() {
 		for range quit.ClickedCh {
 			log.Println("quitting")
