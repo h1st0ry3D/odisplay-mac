@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Build OdisplayMac.app.
+#
+# macOS treats a menu bar app differently from a plain binary: without a bundle
+# it gets a Dock icon, a generic name, and no stable identity. TCC permissions
+# are granted per bundle, so a bundle that changes identity between builds loses
+# them. That is why this makes a bundle rather than leaving a binary.
+#
+# Run this on the Mac. Nothing here works on Linux, because the bundle format
+# and the toolchain are both macOS's.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+APP="build/OdisplayMac.app"
+BIN="odisplay-mac"
+
+if ! command -v go >/dev/null; then
+	echo "go is not on PATH. Install Go 1.22 or newer." >&2
+	exit 1
+fi
+
+echo "==> checking odisplay is where this will look for it"
+found=""
+for p in /usr/local/bin/odisplay "$HOME/.local/bin/odisplay" /opt/homebrew/bin/odisplay; do
+	if [ -x "$p" ]; then
+		found="$p"
+		break
+	fi
+done
+if [ -z "$found" ]; then
+	echo "odisplay is not installed, so this will start and say so." >&2
+	echo "    Build it from https://github.com/h1st0ry3D/odisplay-cli" >&2
+else
+	echo "    found $found"
+fi
+
+echo "==> running the tests"
+# These run anywhere, including here, and cover everything except the drawing.
+go test ./internal/...
+
+echo "==> building"
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+
+# cgo is required: systray talks to AppKit through it.
+CGO_ENABLED=1 GOOS=darwin go build -trimpath -ldflags "-s -w" \
+	-o "$APP/Contents/MacOS/$BIN" ./cmd/odisplay-mac
+
+cat > "$APP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>Odisplay</string>
+	<key>CFBundleDisplayName</key>
+	<string>Odisplay</string>
+	<key>CFBundleExecutable</key>
+	<string>odisplay-mac</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.github.h1st0ry3d.odisplay-mac</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+
+	<!-- A menu bar app: no Dock icon, no window. -->
+	<key>LSUIElement</key>
+	<true/>
+
+	<!-- Without this the icon and any text render blurry on a Retina display. -->
+	<key>NSHighResolutionCapable</key>
+	<true/>
+
+	<!-- This app sends HID reports to a Logitech receiver to move the keyboard
+	     and mouse between machines. macOS gates that behind Input Monitoring,
+	     so the app has to say why it wants it rather than being refused. -->
+	<key>NSInputMonitoringUsageDescription</key>
+	<string>Odisplay moves your Logitech keyboard and mouse to another paired computer when you switch the monitor.</string>
+</dict>
+</plist>
+PLIST
+
+# Ad-hoc signed. macOS identifies an unsigned binary by path and code hash, so
+# an unsigned rebuild silently loses an Input Monitoring permission it had.
+echo "==> signing (ad-hoc)"
+codesign --force --sign - --timestamp=none "$APP" 2>/dev/null \
+	|| echo "    codesign not available; the app will run but may lose permissions on rebuild"
+
+echo
+echo "==> done: $APP"
+echo
+echo "Move it to /Applications and open it. The icon appears in the menu bar."
+echo
+echo "If the keyboard and mouse do not move, grant Input Monitoring:"
+echo "    System Settings > Privacy & Security > Input Monitoring"

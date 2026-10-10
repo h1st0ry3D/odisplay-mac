@@ -1,5 +1,7 @@
-# Built app bundle
-/build/
+# The built app bundle. build/build.sh is the script that makes it and is
+# tracked, so this ignores the output rather than the directory: ignoring the
+# directory shipped a README that told people to run a file that was not there.
+/build/*.app
 
 # Go
 *.test
