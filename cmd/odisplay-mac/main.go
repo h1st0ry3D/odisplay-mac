@@ -63,9 +63,9 @@ type app struct {
 	built    bool
 	builtFor []string
 	statusIt *systray.MenuItem
-	// detailIt carries the reason a switch failed and any advice about it.
-	detailIt []*systray.MenuItem
-	rows     []*row
+	// statusLines are the reason a switch failed and any advice about it.
+	statusLines []*systray.MenuItem
+	rows        []*row
 	// renameIt is the rename submenu, one entry per input.
 	renameIt     *systray.MenuItem
 	renameChoice map[string]*systray.MenuItem
@@ -163,55 +163,38 @@ func shape(keys []string, installed bool, extraLines int) []string {
 // In place where it can, rebuilt where it must: the shape is stable for
 // everything that happens in normal use, so only a settings edit that adds or
 // removes an input costs a rebuild.
+//
+// Everything it needs is taken under one lock and then used without it. The
+// calls below add and edit menu items, which is not something to do while
+// holding a mutex the rest of the program wants.
 func (a *app) render() {
 	a.mu.Lock()
-	client, settings, status, busy := a.client, a.settings, a.status, a.busy
-	installed := client != nil
-	var keys []string
+	settings, status, busy := a.settings, a.status, a.busy
+	installed := a.client != nil
+	keys := make([]string, 0, len(settings.Inputs))
 	for _, in := range settings.Inputs {
 		keys = append(keys, in.Key)
 	}
 	a.mu.Unlock()
 
-	extra := 0
-	if oneLine(status.Detail) != "" {
-		extra++
-	}
-	if oneLine(status.Hint) != "" {
-		extra++
-	}
-	want := shape(keys, installed, extra)
+	lines := statusLines(status)
+	want := shape(keys, installed, len(lines))
 	if !a.built || !sameShape(a.builtFor, want) {
-		a.rebuild(installed, settings.Inputs, settings.MonitorOr(), extra)
+		a.rebuild(installed, settings.Inputs, settings.MonitorOr(), len(lines))
 	}
-
-	a.mu.Lock()
-	a.builtFor = want
-	a.built = true
-	a.mu.Unlock()
+	a.built, a.builtFor = true, want
 
 	if !installed {
 		return
 	}
 
-	var model *panel.Model
-	a.mu.Lock()
-	model = panel.Build(a.settings, a.status, a.busy)
-	a.mu.Unlock()
+	model := panel.Build(settings, status, busy)
 
-	if a.statusIt != nil {
-		a.statusIt.SetTitle(model.Status.Text)
-		a.statusIt.SetTooltip(model.Status.Text)
-	}
-	for i, it := range a.detailIt {
-		switch {
-		case i == 0 && model.Status.Detail != "":
-			it.SetTitle(oneLine(model.Status.Detail))
-			it.SetTooltip(model.Status.Detail)
-		case model.Status.Hint != "":
-			it.SetTitle(oneLine(model.Status.Hint))
-			it.SetTooltip(model.Status.Hint)
-		}
+	a.statusIt.SetTitle(model.Status.Text)
+	a.statusIt.SetTooltip(model.Status.Text)
+	for i, it := range a.statusLines {
+		it.SetTitle(lines[i])
+		it.SetTooltip(lines[i])
 	}
 
 	if a.renameIt != nil {
@@ -238,23 +221,13 @@ func (a *app) render() {
 	}
 
 	for _, r := range a.rows {
-		host := "0"
-		label := r.key
-		for _, in := range settings.Inputs {
-			if in.Key == r.key {
-				host = in.HostChannel()
-				label = in.Label()
-			}
-		}
-		if r.label != nil {
-			r.label.SetTitle(label)
-			setEnabled(r.label, !busy)
-		}
-		if r.host != nil {
-			r.host.SetTitle(panel.HostTitle(host))
-			r.host.SetTooltip(panel.HostMeaning(host))
-			setEnabled(r.host, !busy)
-		}
+		in, _ := inputByKey(settings, r.key)
+		host := in.HostChannel()
+		r.label.SetTitle(in.Label())
+		setEnabled(r.label, !busy)
+		r.host.SetTitle(panel.HostTitle(host))
+		r.host.SetTooltip(panel.HostMeaning(host))
+		setEnabled(r.host, !busy)
 		for h, item := range r.choice {
 			if h == host {
 				item.Check()
@@ -264,13 +237,22 @@ func (a *app) render() {
 			setEnabled(item, !busy)
 		}
 	}
-	_ = status
 }
 
-// setEnabled greys an item out or brings it back.
-//
-// Everything an input owns is disabled while a switch is in flight, so a second
-// cannot be started on top of the first.
+// statusLines are the lines under the status itself: the reason a switch gave
+// up, and any advice about it. One function, so the count the menu is built
+// from and the text put into it cannot disagree.
+func statusLines(st panel.Status) []string {
+	var out []string
+	if d := oneLine(st.Detail); d != "" {
+		out = append(out, d)
+	}
+	if h := oneLine(st.Hint); h != "" {
+		out = append(out, h)
+	}
+	return out
+}
+
 func setEnabled(it *systray.MenuItem, enabled bool) {
 	if enabled {
 		it.Enable()
@@ -307,7 +289,7 @@ func sameShape(a, b []string) bool {
 // appear, because the order of these calls is the order of the menu. Keeping
 // that readable matters more here than anywhere else in this program: it is the
 // part no test on another platform can reach.
-func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, extraLines int) {
+func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines int) {
 	for _, it := range a.all {
 		it.Remove()
 	}
@@ -322,14 +304,10 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, extraL
 	}
 
 	a.statusIt = keep(a.addLabel(panel.Idle.Text))
-	if extraLines > 0 {
-		// Right under the status line, where the Omarchy panel puts it too.
-		a.detailIt = make([]*systray.MenuItem, 0, extraLines)
-		for i := 0; i < extraLines; i++ {
-			a.detailIt = append(a.detailIt, keep(a.addLabel("")))
-		}
-	} else {
-		a.detailIt = nil
+	// Right under the status line, where the Omarchy panel puts it too.
+	a.statusLines = nil
+	for i := 0; i < lines; i++ {
+		a.statusLines = append(a.statusLines, keep(a.addLabel("")))
 	}
 
 	if !installed {
