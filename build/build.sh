@@ -48,6 +48,28 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 CGO_ENABLED=1 GOOS=darwin go build -trimpath -ldflags "-s -w" \
 	-o "$APP/Contents/MacOS/$BIN" ./cmd/odisplay-mac
 
+# The icon, from the one master image. icns is a container of ten sizes and
+# only macOS can write it, so this stays here rather than in the repository.
+# sips resizes and iconutil packs, both part of the system.
+echo "==> building the icon"
+if ! command -v iconutil >/dev/null || ! command -v sips >/dev/null; then
+	echo "    sips or iconutil is missing, which should not happen on macOS." >&2
+	echo "    The app will build without an icon." >&2
+else
+	iconset="$(mktemp -d)/AppIcon.iconset"
+	mkdir -p "$iconset"
+	for size in 16 32 128 256 512; do
+		# Each of these is a point size and its retina double, which is why
+		# 32, 128 and 512 appear twice: once as themselves and once as the
+		# double of the size below.
+		sips -z "$size" "$size" build/AppIcon.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
+		double=$((size * 2))
+		sips -z "$double" "$double" build/AppIcon.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+	done
+	iconutil -c icns "$iconset" -o "$APP/Contents/Resources/AppIcon.icns"
+	rm -rf "$(dirname "$iconset")"
+fi
+
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -61,6 +83,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 	<string>odisplay-mac</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.github.h1st0ry3d.odisplay-mac</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
