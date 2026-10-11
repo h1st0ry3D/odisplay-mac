@@ -160,6 +160,21 @@ The icon appears in the menu bar. Click it for the menu.
 
 ### 5. Permissions
 
+**macOS asks this app, not mxswitch, and forgets when you rebuild it.**
+
+That is the single most confusing thing about this. macOS decides whether a program may open a
+Logitech device by looking at the app that started the chain of processes, not at the tool that
+opens the device. So:
+
+- `mxswitch 1` from a terminal **works** — the terminal is what macOS asks
+- the same switch through this app is **asked of this app**, which is a different program with a
+  different permission
+- rebuilding gives this app a new code signature, and **the permission does not survive it**
+
+So it works, then stops after the next build, and the failure looks exactly like a device that has
+gone to sleep. When it happens: remove Odisplay from Privacy & Security → Input Monitoring and add
+it again. A toggle is not enough; the old entry is keyed to the build it was granted to.
+
 **Only `mxswitch` needs Input Monitoring, not `ddcctl`.** `ddcctl` talks I2C to the display and
 never opens a HID device. Inside this app `mxswitch` is a child process, so the grant goes to
 whichever binary opens the device.

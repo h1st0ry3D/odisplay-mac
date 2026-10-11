@@ -85,6 +85,12 @@ type Status struct {
 	// reason is usually the actionable part: mxswitch says to wake the device
 	// and check Input Monitoring, and "the devices did not move" says neither.
 	Detail string
+	// Hint is advice that only the program around this knows, such as how a
+	// permission this platform grants is lost.
+	//
+	// It is a separate line rather than the end of Detail because a menu item
+	// that is too long is cut off, and the end is where the advice would be.
+	Hint string
 }
 
 // Hosts are the Easy-Switch channels a menu offers. "0" is off, which is a real
@@ -242,6 +248,14 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 			Tooltip:  "What the program that failed said",
 			Disabled: true,
 			// Named so a test can find it and the app can update it in place.
+			StatusDetail: true,
+		})
+	}
+	if h := oneLine(status.Hint); h != "" {
+		m.Items = append(m.Items, &Item{
+			Title:        h,
+			Tooltip:      h,
+			Disabled:     true,
 			StatusDetail: true,
 		})
 	}

@@ -63,8 +63,8 @@ type app struct {
 	built    bool
 	builtFor []string
 	statusIt *systray.MenuItem
-	// detailIt carries the reason a switch failed, when there is one.
-	detailIt *systray.MenuItem
+	// detailIt carries the reason a switch failed and any advice about it.
+	detailIt []*systray.MenuItem
 	rows     []*row
 	// renameIt is the rename submenu, one entry per input.
 	renameIt     *systray.MenuItem
@@ -140,15 +140,19 @@ func (a *app) setStatus(s panel.Status) {
 
 // shape is what a menu is built for: which inputs, or none if odisplay is not
 // there. Two settings with the same shape can be drawn by editing titles.
-func shape(keys []string, installed bool, hasDetail bool) []string {
+func shape(keys []string, installed bool, extraLines int) []string {
 	if !installed {
-		return []string{"<not installed>"}
+		out := []string{"<not installed>"}
+		for i := 0; i < extraLines; i++ {
+			out = append(out, "<reason>")
+		}
+		return out
 	}
 	out := append([]string(nil), keys...)
-	if hasDetail {
-		// Its presence is part of the shape, so a failure appearing or
-		// clearing costs one rebuild. The text is not, so a different failure
-		// message does not.
+	// How many lines a failure adds is part of the shape, so one appearing or
+	// clearing costs a rebuild. Their text is not, so a different message does
+	// not.
+	for i := 0; i < extraLines; i++ {
 		out = append(out, "<reason>")
 	}
 	return out
@@ -169,10 +173,16 @@ func (a *app) render() {
 	}
 	a.mu.Unlock()
 
-	hasDetail := oneLine(status.Detail) != ""
-	want := shape(keys, installed, hasDetail)
+	extra := 0
+	if oneLine(status.Detail) != "" {
+		extra++
+	}
+	if oneLine(status.Hint) != "" {
+		extra++
+	}
+	want := shape(keys, installed, extra)
 	if !a.built || !sameShape(a.builtFor, want) {
-		a.rebuild(installed, settings.Inputs, settings.MonitorOr(), hasDetail)
+		a.rebuild(installed, settings.Inputs, settings.MonitorOr(), extra)
 	}
 
 	a.mu.Lock()
@@ -193,9 +203,15 @@ func (a *app) render() {
 		a.statusIt.SetTitle(model.Status.Text)
 		a.statusIt.SetTooltip(model.Status.Text)
 	}
-	if a.detailIt != nil {
-		a.detailIt.SetTitle(oneLine(model.Status.Detail))
-		a.detailIt.SetTooltip(model.Status.Detail)
+	for i, it := range a.detailIt {
+		switch {
+		case i == 0 && model.Status.Detail != "":
+			it.SetTitle(oneLine(model.Status.Detail))
+			it.SetTooltip(model.Status.Detail)
+		case model.Status.Hint != "":
+			it.SetTitle(oneLine(model.Status.Hint))
+			it.SetTooltip(model.Status.Hint)
+		}
 	}
 
 	if a.renameIt != nil {
@@ -291,7 +307,7 @@ func sameShape(a, b []string) bool {
 // appear, because the order of these calls is the order of the menu. Keeping
 // that readable matters more here than anywhere else in this program: it is the
 // part no test on another platform can reach.
-func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, hasDetail bool) {
+func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, extraLines int) {
 	for _, it := range a.all {
 		it.Remove()
 	}
@@ -306,9 +322,12 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, hasDet
 	}
 
 	a.statusIt = keep(a.addLabel(panel.Idle.Text))
-	if hasDetail {
+	if extraLines > 0 {
 		// Right under the status line, where the Omarchy panel puts it too.
-		a.detailIt = keep(a.addLabel(""))
+		a.detailIt = make([]*systray.MenuItem, 0, extraLines)
+		for i := 0; i < extraLines; i++ {
+			a.detailIt = append(a.detailIt, keep(a.addLabel("")))
+		}
 	} else {
 		a.detailIt = nil
 	}
@@ -415,7 +434,7 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 		label := labelFor(settings, key)
 		log.Printf("switching to %s (%s)", label, key)
 		res := client.Switch(ctx, key)
-		a.setStatus(panel.ForSwitch(res, label))
+		a.setStatus(withHint(panel.ForSwitch(res, label), res))
 
 	case panel.ActionSetHost:
 		label := labelFor(settings, key)
@@ -470,6 +489,27 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 	// Whatever happened, re-read: a refused change must not stay on screen as
 	// though it took.
 	a.reload()
+}
+
+// withHint adds what this app knows and odisplay cannot.
+//
+// macOS decides whether a program may open a Logitech device by looking at the
+// app that started the chain, not at mxswitch. So a switch run from a terminal
+// works -- the terminal is what is asked -- and the same switch from here is
+// asked of this app. Rebuilding it changes its code signature, and the
+// permission macOS granted does not survive that, which is why this works until
+// the next build and then stops.
+//
+// Worth saying out loud because the failure looks identical to a device that is
+// asleep, and one of those is fixed by pressing a button.
+func withHint(st panel.Status, res cli.Result) panel.Status {
+	if res.Outcome() != cli.OutcomeDevicesFailed {
+		return st
+	}
+	st.Hint = "macOS asks this app for that permission, not mxswitch, and forgets it when " +
+		"the app is rebuilt. Remove Odisplay from Privacy & Security > Input Monitoring " +
+		"and add it again."
+	return st
 }
 
 // oneLine shortens a message to something a menu item can hold. A menu item
