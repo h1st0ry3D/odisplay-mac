@@ -48,19 +48,26 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 CGO_ENABLED=1 GOOS=darwin go build -trimpath -ldflags "-s -w" \
 	-o "$APP/Contents/MacOS/$BIN" ./cmd/odisplay-mac
 
-# The icon. The ten sizes are committed rather than made here.
-#
-# They used to be made with sips from the master, and something in that added a
-# light outline around the black which the master does not have: its edges are
-# the fill colour at full opacity, and every pixel brighter than the fill is the
-# glyph. Making the sizes elsewhere and shipping the bytes leaves the build with
-# one step, iconutil, which packs them and does not resample.
+# The icon, from the one master image. icns is a container of ten sizes and
+# only macOS can write it, so this stays here rather than in the repository.
+# sips resizes and iconutil packs, both part of the system.
 echo "==> building the icon"
-if ! command -v iconutil >/dev/null; then
-	echo "    iconutil is missing, which should not happen on macOS." >&2
+if ! command -v iconutil >/dev/null || ! command -v sips >/dev/null; then
+	echo "    sips or iconutil is missing, which should not happen on macOS." >&2
 	echo "    The app will build without an icon." >&2
 else
-	iconutil -c icns build/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+	iconset="$(mktemp -d)/AppIcon.iconset"
+	mkdir -p "$iconset"
+	for size in 16 32 128 256 512; do
+		# Each of these is a point size and its retina double, which is why
+		# 32, 128 and 512 appear twice: once as themselves and once as the
+		# double of the size below.
+		sips -z "$size" "$size" build/AppIcon.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
+		double=$((size * 2))
+		sips -z "$double" "$double" build/AppIcon.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+	done
+	iconutil -c icns "$iconset" -o "$APP/Contents/Resources/AppIcon.icns"
+	rm -rf "$(dirname "$iconset")"
 fi
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
