@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -80,18 +81,32 @@ func TestListReadsTheSettings(t *testing.T) {
 
 // The app never decides a platform rule. odisplay resolves the per-platform
 // display number before it prints, so what arrives is the number in force here.
+//
+// The three numbers are all different, so which one comes back says which rule
+// was applied. The expected one is read from the map for the platform this is
+// running on rather than written down, because a test that names one machine's
+// answer is a test that passes on that machine and fails on the others. This
+// one asserted 1 when it was written, which is right on Linux and wrong on
+// macOS, where the darwin entry is the answer.
 func TestListReportsTheNumberInForceHere(t *testing.T) {
-	c := scratch(t, `{"version":1,"display":1,"displays":{"darwin":4},"inputs":[{"key":"dp","vcp":15}]}`)
+	c := scratch(t, `{"version":1,"display":7,"displays":{"linux":3,"darwin":4},"inputs":[{"key":"dp","vcp":15}]}`)
 	s, err := c.List(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Display != 1 {
-		t.Errorf("display = %d, want this machine's own number", s.Display)
+	want, ok := s.Displays[runtime.GOOS]
+	if !ok {
+		t.Fatalf("the test needs an entry for %s, and the settings have %v", runtime.GOOS, s.Displays)
 	}
-	// The map is still carried, for anything that wants to show it.
-	if s.Displays["darwin"] != 4 {
-		t.Errorf("displays = %v, want the other machine's kept", s.Displays)
+	if s.Display != want {
+		t.Errorf("display = %d, want the %s entry, which is %d", s.Display, runtime.GOOS, want)
+	}
+	if s.Display == 7 {
+		t.Error("display is the shared default, so the platform entry was ignored")
+	}
+	// The whole map is still carried, for anything that wants to show it.
+	if s.Displays["linux"] != 3 || s.Displays["darwin"] != 4 {
+		t.Errorf("displays = %v, want both kept", s.Displays)
 	}
 }
 
@@ -174,9 +189,22 @@ func TestADryRunIsItsOwnCodePath(t *testing.T) {
 	if res.Code != 0 {
 		t.Fatalf("a dry run exited %d: %s", res.Code, res.Detail)
 	}
-	// It has to name the commands, or it is not showing anything.
-	if !strings.Contains(res.Message, "ddcutil") {
-		t.Errorf("dry run printed %q, want the commands it would run", res.Message)
+	// It has to print the commands, and commands are absolute paths to the
+	// programs. Naming one would tie this to the machine it was written on:
+	// this asked for ddcutil, which is what a dry run says on Linux and never
+	// on macOS.
+	_, commands, said := strings.Cut(res.Message, "would run:")
+	if !said {
+		t.Fatalf("dry run does not say what it would run: %q", res.Message)
+	}
+	printed := 0
+	for _, line := range strings.Split(strings.TrimSpace(commands), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "/") {
+			printed++
+		}
+	}
+	if printed == 0 {
+		t.Errorf("dry run printed %q, want at least one command", res.Message)
 	}
 }
 
@@ -452,12 +480,25 @@ func TestNewFindsTheBinaryItIsGiven(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// An install ahead of the planted one would win, and this could not tell
+	// which New found. Say so rather than asserting something the machine
+	// decides.
+	planted := filepath.Join(binDir, "odisplay")
+	for _, earlier := range Candidates() {
+		if earlier == planted {
+			break
+		}
+		if _, err := os.Stat(earlier); err == nil {
+			t.Skipf("%s exists, so it wins and the planted one cannot be isolated", earlier)
+		}
+	}
+
 	c, err := New()
 	if err != nil {
 		t.Fatalf("New did not find the binary it was given: %v", err)
 	}
-	if c.Path != filepath.Join(binDir, "odisplay") {
-		t.Errorf("found %q", c.Path)
+	if c.Path != planted {
+		t.Errorf("found %q, want the one in the user's own bin, %s", c.Path, planted)
 	}
 }
 
