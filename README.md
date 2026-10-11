@@ -28,10 +28,19 @@ Rename
   USB-C…                   ▸
   Mac Mini…                ▸
   PC…                      ▸
+Hide
+  USB-C                    ▸
+  Mac Mini                 ▸
+  PC                       ▸
 Display: 1                 ▸
 ──────────────────────────
 Quit
 ```
+
+**Hide** leaves an input out of the menu without removing it, with a tick on the ones that are
+hidden. The setting is the same one the Omarchy panel's right-click edits, the same file holds it,
+and `odisplay switch` still reaches a hidden input — which is what makes hiding the one you are on
+a reasonable thing to do. Every input is listed, so a hidden one is one click from coming back.
 
 **Rename** asks for a new name for one input and records it with `odisplay set name`, so it is the
 same setting the Omarchy panel's right-click edits and the same file holds it. Emptying the field

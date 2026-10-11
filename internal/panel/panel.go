@@ -33,6 +33,9 @@ const (
 	ActionSetHost
 	// ActionRename asks for a new name for an input and records it.
 	ActionRename
+	// ActionToggleHidden shows or hides an input. Nothing is switched, so it
+	// is safe to do to the input that is in use.
+	ActionToggleHidden
 	// ActionSetDisplay records which display this machine switches. It only
 	// writes the setting; nothing moves until an input is switched to.
 	ActionSetDisplay
@@ -104,6 +107,15 @@ var Hosts = []string{"0", "1", "2", "3"}
 // displays it accepts, and ddcctl has no listing mode at all. A number the
 // machine does not have is refused when it is used, and the switch reports it.
 var DisplayChoices = []int{1, 2, 3, 4}
+
+// hiddenTooltip says what clicking would do, which is the opposite of what the
+// item currently says.
+func HiddenTooltip(in cli.Input) string {
+	if in.Hidden {
+		return "Show " + in.Label() + " in this menu again"
+	}
+	return "Hide " + in.Label() + " from this menu"
+}
 
 // DisplayTitle is what one choice in the picker reads.
 //
@@ -267,7 +279,7 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 		})
 	}
 
-	for _, in := range s.Inputs {
+	for _, in := range s.Visible() {
 		label := in.Label()
 		host := in.HostChannel()
 
@@ -322,6 +334,28 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 		})
 	}
 	m.Items = append(m.Items, renameItem)
+
+	// Every input, not just the visible ones: this is the only place a hidden
+	// one appears, and a list without it is one you cannot undo from.
+	hideItem := &Item{
+		Title:    "Hide",
+		Tooltip:  "Keep an input out of this menu without removing it",
+		Action:   ActionNone,
+		Disabled: busy,
+	}
+	for _, in := range s.Inputs {
+		hideItem.Children = append(hideItem.Children, &Item{
+			Title:   in.Label(),
+			Tooltip: HiddenTooltip(in),
+			// Ticked where it is hidden, so what is hidden is readable without
+			// clicking anything. Same control as the display picker.
+			Checked:  in.Hidden,
+			Action:   ActionToggleHidden,
+			Key:      in.Key,
+			Disabled: busy,
+		})
+	}
+	m.Items = append(m.Items, hideItem)
 
 	displayItem := &Item{
 		Title:    "Display",

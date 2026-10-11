@@ -531,3 +531,87 @@ func TestTheFallbackReasonIsShownToo(t *testing.T) {
 		t.Errorf("no fallback reason shown:\n%s", m.Describe())
 	}
 }
+
+// Hiding is a view setting. The row goes and the input stays, and the Hide list
+// is the only place it appears -- which is what makes hiding undoable.
+func TestAHiddenInputGetsNoRow(t *testing.T) {
+	s := settings()
+	s.Inputs[1].Hidden = true // Mac Mini
+	m := Build(s, Idle, false)
+
+	if find(m, "Mac Mini") != nil {
+		t.Errorf("a hidden input still has a row:\n%s", m.Describe())
+	}
+	hide := find(m, "Hide")
+	if hide == nil {
+		t.Fatalf("no Hide control:\n%s", m.Describe())
+	}
+	found := false
+	for _, c := range hide.Children {
+		if c.Title == "Mac Mini" {
+			found = true
+			if !c.Checked {
+				t.Error("a hidden input is not ticked in the Hide list")
+			}
+		}
+	}
+	if !found {
+		t.Error("a hidden input cannot be reached to unhide it")
+	}
+}
+
+// Every input is offered, including the visible ones, or the list would shrink
+// as things were hidden and there would be no way back to the ones already
+// shown.
+func TestHideOffersEveryInput(t *testing.T) {
+	s := settings()
+	s.Inputs[0].Hidden = true
+	hide := find(Build(s, Idle, false), "Hide")
+	if hide == nil {
+		t.Fatal("no Hide control")
+	}
+	if len(hide.Children) != len(s.Inputs) {
+		t.Fatalf("choices = %d, want %d", len(hide.Children), len(s.Inputs))
+	}
+	shown := 0
+	for _, c := range hide.Children {
+		if !c.Checked {
+			shown++
+		}
+	}
+	if shown != len(s.Inputs)-1 {
+		t.Errorf("%d unticked, want one tick per hidden input", shown)
+	}
+}
+
+// Nothing hidden means every row and an unticked list, so a menu that has never
+// used this looks exactly as it did before.
+func TestNothingHiddenLooksUnchanged(t *testing.T) {
+	m := Build(settings(), Idle, false)
+	for _, in := range settings().Inputs {
+		if find(m, in.Label()) == nil {
+			t.Errorf("%q has no row", in.Label())
+		}
+	}
+	for _, c := range find(m, "Hide").Children {
+		if c.Checked {
+			t.Errorf("%q is ticked with nothing hidden", c.Title)
+		}
+	}
+}
+
+// Hiding the input that is in use is the point, so the row list has to survive
+// losing every one of them.
+func TestHidingEveryInputLeavesAUsableMenu(t *testing.T) {
+	s := settings()
+	for i := range s.Inputs {
+		s.Inputs[i].Hidden = true
+	}
+	m := Build(s, Idle, false)
+	if find(m, "Hide") == nil {
+		t.Fatalf("no Hide control to undo from:\n%s", m.Describe())
+	}
+	if find(m, "No inputs are configured.") != nil {
+		t.Error("inputs exist but the menu says there are none")
+	}
+}

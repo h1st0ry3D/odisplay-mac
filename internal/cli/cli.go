@@ -56,6 +56,9 @@ type Input struct {
 	// Host is the Easy-Switch channel, "0" through "3". odisplay leaves the
 	// key out of the file when it is off, so an absent value means off.
 	Host string `json:"host"`
+	// Hidden keeps this input out of the menu without removing it. The Hide
+	// submenu is the one place it still appears, so it can be brought back.
+	Hidden bool `json:"hidden"`
 }
 
 // Host returns the channel, with an absent or unusable value read as off.
@@ -88,6 +91,18 @@ func (s Settings) MonitorOr() string {
 		return s.Monitor
 	}
 	return "display"
+}
+
+// Visible is the inputs the menu offers. A hidden one is left out here and in
+// the Hide submenu alone, which is where it can be brought back.
+func (s Settings) Visible() []Input {
+	out := make([]Input, 0, len(s.Inputs))
+	for _, in := range s.Inputs {
+		if !in.Hidden {
+			out = append(out, in)
+		}
+	}
+	return out
 }
 
 // Settings is what `list --json` prints.
@@ -315,6 +330,17 @@ func (c *Client) SetHost(ctx context.Context, key, host string) Result {
 // so setting it on a Mac cannot change what a Linux box uses.
 func (c *Client) SetDisplay(ctx context.Context, number int) Result {
 	res, _ := c.run(ctx, "set", "display", strconv.Itoa(number))
+	return res
+}
+
+// SetHidden shows or hides an input in the menu. It switches nothing, so it is
+// safe to do to the input that is in use.
+func (c *Client) SetHidden(ctx context.Context, key string, hidden bool) Result {
+	word := "off"
+	if hidden {
+		word = "on"
+	}
+	res, _ := c.run(ctx, "set", "hidden", key, word)
 	return res
 }
 

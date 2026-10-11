@@ -69,6 +69,10 @@ type app struct {
 	// renameIt is the rename submenu, one entry per input.
 	renameIt     *systray.MenuItem
 	renameChoice map[string]*systray.MenuItem
+	// hideIt is the hide submenu, one entry per input including the hidden
+	// ones, which is the only place they appear.
+	hideIt     *systray.MenuItem
+	hideChoice map[string]*systray.MenuItem
 	// displayIt is the picker and its choices, kept so the tick can move and
 	// the title can name the number in force.
 	displayIt     *systray.MenuItem
@@ -171,8 +175,9 @@ func (a *app) render() {
 	a.mu.Lock()
 	settings, status, busy := a.settings, a.status, a.busy
 	installed := a.client != nil
-	keys := make([]string, 0, len(settings.Inputs))
-	for _, in := range settings.Inputs {
+	shown := settings.Visible()
+	keys := make([]string, 0, len(shown))
+	for _, in := range shown {
 		keys = append(keys, in.Key)
 	}
 	a.mu.Unlock()
@@ -204,6 +209,24 @@ func (a *app) render() {
 				c.SetTitle(in.Label() + "…")
 				setEnabled(c, !busy)
 			}
+		}
+	}
+
+	if a.hideIt != nil {
+		setEnabled(a.hideIt, !busy)
+		for _, in := range settings.Inputs {
+			c := a.hideChoice[in.Key]
+			if c == nil {
+				continue
+			}
+			c.SetTitle(in.Label())
+			c.SetTooltip(panel.HiddenTooltip(in))
+			if in.Hidden {
+				c.Check()
+			} else {
+				c.Uncheck()
+			}
+			setEnabled(c, !busy)
 		}
 	}
 
@@ -315,7 +338,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines 
 			keep(a.addLabel(path))
 		}
 	} else {
-		for _, in := range inputs {
+		for _, in := range visible(inputs) {
 			keep(a.addLabel(""))
 
 			r := &row{key: in.Key, choice: map[string]*systray.MenuItem{}}
@@ -348,6 +371,17 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines 
 		}
 	}
 	setEnabled(a.renameIt, installed)
+
+	a.hideIt = keep(systray.AddMenuItem("Hide", "Keep an input out of this menu without removing it"))
+	a.hideChoice = map[string]*systray.MenuItem{}
+	if installed {
+		for _, in := range inputs {
+			c := a.hideIt.AddSubMenuItemCheckbox(in.Label(), panel.HiddenTooltip(in), in.Hidden)
+			a.hideChoice[in.Key] = c
+			a.wire(c, panel.ActionToggleHidden, in.Key, "", 0)
+		}
+	}
+	setEnabled(a.hideIt, installed)
 
 	a.displayIt = keep(systray.AddMenuItem("Display", "Which display this machine switches"))
 	a.displayChoice = map[int]*systray.MenuItem{}
@@ -449,6 +483,22 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 		res := client.SetName(ctx, key, name)
 		a.setStatus(panel.ForSetting(res, "Renamed to "+nameOr(in, name)+"."))
 
+	case panel.ActionToggleHidden:
+		in, ok := inputByKey(settings, key)
+		if !ok {
+			break
+		}
+		log.Printf("hiding=%v for %s", !in.Hidden, key)
+		// Setting rather than toggling, so what is written is what this
+		// decided from what it had read. A toggle would depend on the two
+		// agreeing about the current state.
+		res := client.SetHidden(ctx, key, !in.Hidden)
+		what := in.Label() + " shown in the menu again."
+		if !in.Hidden {
+			what = in.Label() + " hidden from the menu."
+		}
+		a.setStatus(panel.ForSetting(res, what))
+
 	case panel.ActionSetDisplay:
 		log.Printf("setting the display to %d", display)
 		res := client.SetDisplay(ctx, display)
@@ -488,6 +538,18 @@ func withHint(st panel.Status, res cli.Result) panel.Status {
 		"the app is rebuilt. Remove Odisplay from Privacy & Security > Input Monitoring " +
 		"and add it again."
 	return st
+}
+
+// visible is the inputs whose rows are shown, which is also what the menu is
+// shaped from.
+func visible(inputs []cli.Input) []cli.Input {
+	out := make([]cli.Input, 0, len(inputs))
+	for _, in := range inputs {
+		if !in.Hidden {
+			out = append(out, in)
+		}
+	}
+	return out
 }
 
 // oneLine shortens a message to something a menu item can hold. A menu item
