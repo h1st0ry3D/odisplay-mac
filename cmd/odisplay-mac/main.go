@@ -63,6 +63,8 @@ type app struct {
 	built    bool
 	builtFor []string
 	statusIt *systray.MenuItem
+	// detailIt carries the reason a switch failed, when there is one.
+	detailIt *systray.MenuItem
 	rows     []*row
 	// renameIt is the rename submenu, one entry per input.
 	renameIt     *systray.MenuItem
@@ -138,11 +140,18 @@ func (a *app) setStatus(s panel.Status) {
 
 // shape is what a menu is built for: which inputs, or none if odisplay is not
 // there. Two settings with the same shape can be drawn by editing titles.
-func shape(keys []string, installed bool) []string {
+func shape(keys []string, installed bool, hasDetail bool) []string {
 	if !installed {
 		return []string{"<not installed>"}
 	}
-	return keys
+	out := append([]string(nil), keys...)
+	if hasDetail {
+		// Its presence is part of the shape, so a failure appearing or
+		// clearing costs one rebuild. The text is not, so a different failure
+		// message does not.
+		out = append(out, "<reason>")
+	}
+	return out
 }
 
 // render brings the menu up to date.
@@ -160,9 +169,10 @@ func (a *app) render() {
 	}
 	a.mu.Unlock()
 
-	want := shape(keys, installed)
+	hasDetail := oneLine(status.Detail) != ""
+	want := shape(keys, installed, hasDetail)
 	if !a.built || !sameShape(a.builtFor, want) {
-		a.rebuild(installed, settings.Inputs, settings.MonitorOr())
+		a.rebuild(installed, settings.Inputs, settings.MonitorOr(), hasDetail)
 	}
 
 	a.mu.Lock()
@@ -182,6 +192,10 @@ func (a *app) render() {
 	if a.statusIt != nil {
 		a.statusIt.SetTitle(model.Status.Text)
 		a.statusIt.SetTooltip(model.Status.Text)
+	}
+	if a.detailIt != nil {
+		a.detailIt.SetTitle(oneLine(model.Status.Detail))
+		a.detailIt.SetTooltip(model.Status.Detail)
 	}
 
 	if a.renameIt != nil {
@@ -277,7 +291,7 @@ func sameShape(a, b []string) bool {
 // appear, because the order of these calls is the order of the menu. Keeping
 // that readable matters more here than anywhere else in this program: it is the
 // part no test on another platform can reach.
-func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string) {
+func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, hasDetail bool) {
 	for _, it := range a.all {
 		it.Remove()
 	}
@@ -292,6 +306,12 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string) {
 	}
 
 	a.statusIt = keep(a.addLabel(panel.Idle.Text))
+	if hasDetail {
+		// Right under the status line, where the Omarchy panel puts it too.
+		a.detailIt = keep(a.addLabel(""))
+	} else {
+		a.detailIt = nil
+	}
 
 	if !installed {
 		for _, path := range cli.Candidates() {

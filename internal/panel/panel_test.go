@@ -475,3 +475,59 @@ func TestEveryHostControlUsesTheSameLabel(t *testing.T) {
 		t.Errorf("%d EasySwitch controls, want one per input (%d)", found, len(settings().Inputs))
 	}
 }
+
+// The reason a switch failed has to reach the menu.
+//
+// mxswitch says "Click the mouse to wake it, and check Input Monitoring" when
+// it cannot find the device, and odisplay carries that up as the detail. It was
+// being dropped, so a failed switch said only that the devices did not move,
+// which is the one thing the person already knew.
+func TestTheReasonIsShownUnderTheStatus(t *testing.T) {
+	res := cli.Result{
+		Code:    3,
+		Message: "Sent PC, but the devices did not move.",
+		Detail:  "No Logitech device supporting ChangeHost found. Click the mouse to wake it, and check Input Monitoring.",
+	}
+	m := Build(settings(), ForSwitch(res, "PC"), false)
+
+	var detail *Item
+	for _, it := range m.Items {
+		if it.StatusDetail {
+			detail = it
+		}
+	}
+	if detail == nil {
+		t.Fatalf("no reason shown:\n%s", m.Describe())
+	}
+	if !strings.Contains(detail.Title, "Input Monitoring") {
+		t.Errorf("reason = %q, want the part that says what to do", detail.Title)
+	}
+	if !detail.Disabled {
+		t.Error("the reason line is clickable")
+	}
+}
+
+// No reason means no line, or every ordinary switch would grow an empty row.
+func TestNoReasonMeansNoLine(t *testing.T) {
+	m := Build(settings(), ForSwitch(cli.Result{Code: 0, Message: "Sent PC."}, "PC"), false)
+	for _, it := range m.Items {
+		if it.StatusDetail {
+			t.Errorf("a successful switch shows a reason line: %q", it.Title)
+		}
+	}
+}
+
+// The fallback text is used when odisplay said nothing, and it belongs in the
+// same place.
+func TestTheFallbackReasonIsShownToo(t *testing.T) {
+	m := Build(settings(), ForSwitch(cli.Result{Code: 3}, "PC"), false)
+	found := false
+	for _, it := range m.Items {
+		if it.StatusDetail && strings.Contains(it.Title, "button") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no fallback reason shown:\n%s", m.Describe())
+	}
+}

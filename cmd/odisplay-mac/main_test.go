@@ -14,6 +14,7 @@ func TestShapeChangesOnlyWhenTheInputsDo(t *testing.T) {
 		name          string
 		before, after []string
 		installed     [2]bool
+		detail        [2]bool
 		wantSame      bool
 	}{
 		{
@@ -67,7 +68,9 @@ func TestShapeChangesOnlyWhenTheInputsDo(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		got := sameShape(shape(c.before, c.installed[0]), shape(c.after, c.installed[1]))
+		got := sameShape(
+			shape(c.before, c.installed[0], c.detail[0]),
+			shape(c.after, c.installed[1], c.detail[1]))
 		if got != c.wantSame {
 			t.Errorf("%s: sameShape = %v, want %v", c.name, got, c.wantSame)
 		}
@@ -95,14 +98,30 @@ func TestLabelForFallsBackToTheKey(t *testing.T) {
 // Not installed and no inputs both build a menu, and neither may panic. This is
 // the state the app starts in before it has read anything.
 func TestShapeOfTheNotInstalledMenu(t *testing.T) {
-	got := shape(nil, false)
+	got := shape(nil, false, false)
 	if len(got) != 1 || got[0] != "<not installed>" {
 		t.Errorf("shape = %v", got)
 	}
 	// No inputs but installed is a different shape from not installed, or the
 	// menu would not be rebuilt when odisplay appears.
-	empty := shape(nil, true)
+	empty := shape(nil, true, false)
 	if len(empty) == len(got) && len(got) == 1 && empty[0] == got[0] {
 		t.Error("no inputs and not installed produce the same shape")
+	}
+}
+
+// The reason line is part of the menu's shape, so a failure appearing or
+// clearing costs one rebuild. The text is not, so a different failure message
+// does not: that would rebuild the menu every time a switch was reported.
+func TestTheReasonChangesTheShape(t *testing.T) {
+	keys := []string{"usbc", "dp"}
+	if sameShape(shape(keys, true, false), shape(keys, true, true)) {
+		t.Error("a reason appearing does not change the shape, so it would not be drawn")
+	}
+	if !sameShape(shape(keys, true, true), shape(keys, true, true)) {
+		t.Error("the same shape with a reason differs from itself")
+	}
+	if sameShape(shape(keys, true, false), shape(keys, false, false)) {
+		t.Error("installed and not installed are not the same shape")
 	}
 }

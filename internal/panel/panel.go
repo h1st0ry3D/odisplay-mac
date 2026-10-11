@@ -67,6 +67,9 @@ type Item struct {
 	Host string
 	// Display is the number an ActionSetDisplay will write.
 	Display int
+	// StatusDetail marks the line carrying the reason a switch failed, which is
+	// not an input's row and has no action of its own.
+	StatusDetail bool
 }
 
 // Status is the line at the top, which reports the last switch.
@@ -77,6 +80,11 @@ type Item struct {
 type Status struct {
 	Text  string
 	Error bool
+	// Detail is the reason underneath, in the words of the program that
+	// failed. It is shown as its own line rather than dropped, because the
+	// reason is usually the actionable part: mxswitch says to wake the device
+	// and check Input Monitoring, and "the devices did not move" says neither.
+	Detail string
 }
 
 // Hosts are the Easy-Switch channels a menu offers. "0" is off, which is a real
@@ -144,20 +152,23 @@ var Idle = Status{Text: "Set input source"}
 // glance: the devices moved with the monitor, or they did not and the button
 // underneath is the way back.
 func ForSwitch(res cli.Result, label string) Status {
-	if res.Outcome() == cli.OutcomeOK {
-		return Status{Text: oneLine(res.MessageOr(label))}
+	out := Status{
+		Text:   oneLine(res.MessageOr(label)),
+		Error:  res.Outcome() != cli.OutcomeOK,
+		Detail: oneLine(res.DetailOr()),
 	}
-	return Status{Text: oneLine(res.MessageOr(label)), Error: true}
+	return out
 }
 
 // ForSetting builds the line that reports a saved change, which is the same
 // shape as a failed switch: a change that did not take must not look like one
 // that did.
 func ForSetting(res cli.Result, what string) Status {
-	if res.Outcome() == cli.OutcomeOK {
-		return Status{Text: oneLine(what)}
+	return Status{
+		Text:   oneLine(res.MessageOr(what)),
+		Error:  res.Outcome() != cli.OutcomeOK,
+		Detail: oneLine(res.DetailOr()),
 	}
-	return Status{Text: oneLine(res.MessageOr(what)), Error: true}
 }
 
 // oneLine makes a string fit a menu item.
@@ -225,6 +236,15 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 		Tooltip:  tooltipFor(status),
 		Disabled: true,
 	})
+	if d := oneLine(status.Detail); d != "" {
+		m.Items = append(m.Items, &Item{
+			Title:    d,
+			Tooltip:  "What the program that failed said",
+			Disabled: true,
+			// Named so a test can find it and the app can update it in place.
+			StatusDetail: true,
+		})
+	}
 
 	if len(s.Inputs) == 0 {
 		m.Items = append(m.Items, &Item{
