@@ -124,3 +124,64 @@ func TestScriptCarriesTheCurrentName(t *testing.T) {
 		t.Errorf("Script does not carry the current name: %s", got)
 	}
 }
+
+// A generated script has to be a script, not just the right words in order.
+//
+// This is the test that was missing when the first version shipped without its
+// closing parenthesis: osascript answered with a syntax error and the dialog
+// never opened, and every other test here passed because they checked for
+// substrings. Balance is checkable, so it should have been checked.
+func TestScriptIsBalanced(t *testing.T) {
+	cases := []struct{ prompt, def string }{
+		{"Name for this input", "USB-C"},
+		{"", ""},
+		{"a (parenthesis)", "and } a brace"},
+		{`quotes " inside`, `and " more`},
+		{`a ) close and a ( open`, `{ unbalanced }`},
+		{"new\nline", "tab\there"},
+	}
+	for _, c := range cases {
+		got := Script(c.prompt, c.def)
+		parens, braces := balance(got)
+		if parens != 0 {
+			t.Errorf("Script(%q, %q) has %d unclosed parens: %s", c.prompt, c.def, parens, got)
+		}
+		if braces != 0 {
+			t.Errorf("Script(%q, %q) has %d unclosed braces: %s", c.prompt, c.def, braces, got)
+		}
+	}
+}
+
+// balance counts unclosed parens and braces outside quoted literals, so a
+// bracket inside a name is not mistaken for one in the script.
+func balance(script string) (parens, braces int) {
+	inLiteral := false
+	for i := 0; i < len(script); i++ {
+		c := script[i]
+		switch {
+		case c == '\\' && inLiteral:
+			i++ // the next character is quoted, whatever it is
+		case c == '"':
+			inLiteral = !inLiteral
+		case inLiteral:
+			// Not script.
+		case c == '(':
+			parens++
+		case c == ')':
+			parens--
+		case c == '{':
+			braces++
+		case c == '}':
+			braces--
+		}
+	}
+	return parens, braces
+}
+
+// The particular shape of the bug: the dialog call has to be closed.
+func TestScriptClosesTheDialogCall(t *testing.T) {
+	got := Script("p", "d")
+	if !strings.Contains(got, `default button "Save")`) {
+		t.Errorf("Script does not close the call: %s", got)
+	}
+}

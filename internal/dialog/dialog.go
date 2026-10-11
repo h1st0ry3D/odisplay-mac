@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -39,9 +40,13 @@ var ErrCancelled = errors.New("dialog cancelled")
 // containing a quote is a name this has to survive rather than one it can
 // assume away.
 func Script(prompt, defaultValue string) string {
+	// The closing paren is load-bearing and was missing when this was first
+	// written: osascript answered with a syntax error and the dialog never
+	// opened, while every test here passed, because they looked for the right
+	// words rather than for the script being a script.
 	return fmt.Sprintf(
 		`text returned of (display dialog %s default answer %s `+
-			`with title "Odisplay" buttons {"Cancel", "Save"} default button "Save"`,
+			`with title "Odisplay" buttons {"Cancel", "Save"} default button "Save")`,
 		literal(prompt), literal(defaultValue))
 }
 
@@ -84,23 +89,33 @@ func Ask(ctx context.Context, prompt, defaultValue string) (text string, ok bool
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, osascript, "-e", Script(prompt, defaultValue))
-	// A bare environment. osascript needs no more, and nothing in the session
-	// should be able to change what it does.
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "LANG=C", "LC_ALL=C"}
+
+	// The session's own environment, unlike the helper programs this app runs.
+	//
+	// Those get a bare one so nothing in the session can change what a program
+	// name resolves to. There is nothing of that kind to protect here: the
+	// program is one fixed absolute path and the script is built by this
+	// package, so the environment cannot change what runs. Stripping it was
+	// unnecessary, and osascript is a system framework client rather than a
+	// plain unix tool, so removing what it was started with is a good way to
+	// have it fail for a reason that has nothing to do with the dialog.
+	cmd.Env = os.Environ()
 
 	var out, errBuf strings.Builder
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
 
 	if err := cmd.Run(); err != nil {
-		said := errBuf.String()
+		said := strings.TrimSpace(errBuf.String())
 		if isCancelled(said) {
 			return "", false, ErrCancelled
 		}
 		if said == "" {
+			// It failed without a word, which is unusual and worth saying
+			// rather than reporting as an empty error.
 			said = err.Error()
 		}
-		return "", false, fmt.Errorf("osascript: %s", strings.TrimSpace(said))
+		return "", false, fmt.Errorf("osascript: %s", said)
 	}
 
 	// osascript appends a newline to what it prints.

@@ -417,7 +417,14 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 		if err != nil || !asked {
 			if err != nil && !errors.Is(err, dialog.ErrCancelled) {
 				log.Printf("rename dialog: %v", err)
-				a.setStatus(panel.Status{Text: "Could not open the rename dialog.", Error: true})
+				// The reason goes in the menu, not only in the log. A log from
+				// an app launched by Finder is somewhere nobody looks, and
+				// "could not open the dialog" on its own is not something
+				// anyone can act on.
+				a.setStatus(panel.Status{
+					Text:  "Rename: " + oneLine(err.Error()),
+					Error: true,
+				})
 			}
 			break
 		}
@@ -443,6 +450,17 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 	// Whatever happened, re-read: a refused change must not stay on screen as
 	// though it took.
 	a.reload()
+}
+
+// oneLine shortens a message to something a menu item can hold. A menu item
+// ellipsises its middle, which would cut out the part that says what happened.
+func oneLine(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	const limit = 120
+	if len(s) > limit {
+		return s[:limit-1] + "…"
+	}
+	return s
 }
 
 // nameOr is what the status line says after a rename. An empty name means the
