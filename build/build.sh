@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build OdisplayMac.app.
+# Build Odisplay.app.
 #
 # macOS treats a menu bar app differently from a plain binary: without a bundle
 # it gets a Dock icon, a generic name, and no stable identity. TCC permissions
@@ -13,7 +13,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-APP="build/OdisplayMac.app"
+APP="build/Odisplay.app"
 BIN="odisplay-mac"
 
 if ! command -v go >/dev/null; then

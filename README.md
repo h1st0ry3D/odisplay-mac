@@ -146,14 +146,14 @@ cd odisplay-mac
 ./build/build.sh
 ```
 
-That runs the tests first, then builds `build/OdisplayMac.app`.
+That runs the tests first, then builds `build/Odisplay.app`.
 
 It is a bundle rather than a bare binary on purpose: macOS gives a menu bar app a Dock icon and no
 stable identity without one, and permissions are granted per bundle.
 
 ```sh
-mv build/OdisplayMac.app /Applications/
-open /Applications/OdisplayMac.app
+mv build/Odisplay.app /Applications/
+open /Applications/Odisplay.app
 ```
 
 The icon appears in the menu bar. Click it for the menu.
@@ -222,7 +222,7 @@ fails safely: you keep your input.
 ### Uninstall
 
 ```sh
-rm -rf /Applications/OdisplayMac.app
+rm -rf /Applications/Odisplay.app
 rm ~/.local/bin/odisplay                       # if you want the CLI gone too
 ```
 
@@ -233,7 +233,7 @@ survive. Delete that too if you want them gone.
 
 ```sh
 cd ~/github/odisplay-mac && git pull && ./build/build.sh
-mv build/OdisplayMac.app /Applications/
+mv build/Odisplay.app /Applications/
 ```
 
 Rebuilding replaces the app, so re-check Input Monitoring afterwards if a switch stops moving the
