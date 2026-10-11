@@ -10,7 +10,7 @@ same one the [Omarchy panel](https://github.com/h1st0ry3D/odisplay) uses.
 The menu bar shows the same fa-tv glyph the Omarchy panel puts in its bar, so the two front ends
 are recognisably the same thing. It is a rendered image rather than the character: the menu bar
 draws text in the system font, where a private-use codepoint is an empty box. It is handed over as
-a *template image* — black with an alpha channel — so macOS inverts it for a dark menu bar and
+a *template image*, black with an alpha channel, so macOS inverts it for a dark menu bar and
 leaves it alone for a light one, with no second file.
 
 ```
@@ -37,12 +37,12 @@ Display: 1                 ▸
 Quit
 ```
 
-**Hide** leaves an input out of the menu without removing it, with a tick on the ones that are
+Hide leaves an input out of the menu without removing it, with a tick on the ones that are
 hidden. The setting is the same one the Omarchy panel's right-click edits, the same file holds it,
-and `odisplay switch` still reaches a hidden input — which is what makes hiding the one you are on
+and `odisplay switch` still reaches a hidden input, which is what makes hiding the one you are on
 a reasonable thing to do. Every input is listed, so a hidden one is one click from coming back.
 
-**Rename** asks for a new name for one input and records it with `odisplay set name`, so it is the
+Rename asks for a new name for one input and records it with `odisplay set name`, so it is the
 same setting the Omarchy panel's right-click edits and the same file holds it. Emptying the field
 restores the built-in label.
 
@@ -53,10 +53,10 @@ The prompt is a real macOS dialog, through `osascript`, rather than a window thi
 keyboard navigable, it follows the system theme, and it is what a menu bar app is expected to do.
 Dismissing it changes nothing and says nothing, because changing your mind is an answer.
 
-The display picker under the inputs offers `display 1` through `4` — labelled with whichever program
-this Mac actually uses, `m1ddc` or `ddcctl` — with a tick on the number in force. The same list and
+The display picker under the inputs offers `display 1` through `4`, labelled with whichever program
+this Mac actually uses, `m1ddc` or `ddcctl`, with a tick on the number in force. The same list and
 the same wording as the Omarchy panel's right-click menu. Picking one
-records it for **this machine only**, so it cannot change what a Linux box uses.
+records it for this machine only, so it cannot change what a Linux box uses.
 
 The list is fixed because `m1ddc` numbers external displays from 1 and skips the built-in one, and
 that numbering is stable enough to offer. A number this machine does not have is refused when it is
@@ -76,7 +76,7 @@ that must not be written twice:
 
 > The monitor moves first. The keyboard and mouse move only once it has.
 
-Clicking a name is **one call**. This app never sees the individual commands, so it cannot put the
+Clicking a name is one call. This app never sees the individual commands, so it cannot put the
 monitor move after the devices move. Clicking a channel only writes a setting; nothing moves until
 that input is switched to.
 
@@ -98,7 +98,7 @@ the devices did not move rather than pretending.
 You do not have to grant it to use the display half. Set every input's channel to `off` and the
 monitor still switches, with no HID access and no prompt.
 
-**Check the display moves before you build any of this.** `odisplay doctor` lists the displays and
+Check the display moves before you build any of this. `odisplay doctor` lists the displays and
 the number to use. If it reports that the monitor did not answer, see
 [If the monitor does not switch](#if-the-monitor-does-not-switch).
 
@@ -109,7 +109,7 @@ brew install m1ddc          # Apple Silicon, which is every Mac since 2020
 # brew install ddcctl       # Intel only
 ```
 
-**On Apple Silicon use `m1ddc`.** `ddcctl` does not work there — it has an open issue from the M1
+On Apple Silicon use `m1ddc`. `ddcctl` does not work there: it has an open issue from the M1
 launch asking for it, its last commit is from November 2022, and its DDC calls report success while
 changing nothing. `odisplay` prefers `m1ddc` when both are installed.
 
@@ -144,7 +144,7 @@ odisplay doctor
 ```
 
 It reports whether the programs are installed and whether the display number in the settings is one
-this machine actually has. **Read it before the first switch** — a display number this Mac will not
+this machine actually has. Read it before the first switch, because a display number this Mac will not
 accept makes every switch a silent no-op while the keyboard and mouse still move.
 
 ### 4. This app
@@ -169,22 +169,22 @@ The icon appears in the menu bar. Click it for the menu.
 
 ### 5. Permissions
 
-**macOS asks this app, not mxswitch, and forgets when you rebuild it.**
+macOS asks this app, not mxswitch, and forgets when you rebuild it.
 
 That is the single most confusing thing about this. macOS decides whether a program may open a
 Logitech device by looking at the app that started the chain of processes, not at the tool that
 opens the device. So:
 
-- `mxswitch 1` from a terminal **works** — the terminal is what macOS asks
-- the same switch through this app is **asked of this app**, which is a different program with a
+- `mxswitch 1` from a terminal works, because the terminal is what macOS asks
+- the same switch through this app is asked of this app, which is a different program with a
   different permission
-- rebuilding gives this app a new code signature, and **the permission does not survive it**
+- rebuilding gives this app a new code signature, and the permission does not survive it
 
 So it works, then stops after the next build, and the failure looks exactly like a device that has
 gone to sleep. When it happens: remove Odisplay from Privacy & Security → Input Monitoring and add
 it again. A toggle is not enough; the old entry is keyed to the build it was granted to.
 
-**Only `mxswitch` needs Input Monitoring, not `ddcctl`.** `ddcctl` talks I2C to the display and
+Only `mxswitch` needs Input Monitoring, not `ddcctl`. `ddcctl` talks I2C to the display and
 never opens a HID device. Inside this app `mxswitch` is a child process, so the grant goes to
 whichever binary opens the device.
 
@@ -192,7 +192,7 @@ whichever binary opens the device.
 `mxswitch` sends, and the two shell calls it makes. Worth five minutes before granting a permission
 that can read keystrokes.
 
-Moving the keyboard and mouse sends HID reports, which macOS gates behind **Input Monitoring**.
+Moving the keyboard and mouse sends HID reports, which macOS gates behind Input Monitoring.
 
 If a switch moves the monitor but the devices do not, grant it in System Settings → Privacy &
 Security → Input Monitoring, adding Odisplay if it is not already listed. Restart the app after.
@@ -206,11 +206,11 @@ Security → Input Monitoring, adding Odisplay if it is not already listed. Rest
 This is a macOS limitation, not a bug in the app, and it is worth knowing before you spend an
 evening on it.
 
-**DDC/CI on Apple Silicon only works on some connections.** macOS reaches a monitor over private
+DDC/CI on Apple Silicon only works on some connections. macOS reaches a monitor over private
 IOKit interfaces that differ by port, and the pattern people report is:
 
 - Thunderbolt and USB-C generally work.
-- A **built-in HDMI port on an M-series Mac often does not**, and neither does some USB-C to HDMI
+- A built-in HDMI port on an M-series Mac often does not, and neither does some USB-C to HDMI
   adapter.
 - Intel Macs are less fussy.
 
@@ -225,7 +225,7 @@ If that lists nothing, it is the connection. Moving the Mac to a Thunderbolt or 
 usual fix. Nothing in this app or the CLI can work around it, because there is no I2C channel to
 talk to.
 
-A switch that cannot move the monitor exits 2 and **leaves the keyboard and mouse alone**, so this
+A switch that cannot move the monitor exits 2 and leaves the keyboard and mouse alone, so this
 fails safely: you keep your input.
 
 ### Uninstall
@@ -271,14 +271,14 @@ one this machine actually has.
 
 ## Status
 
-**This has never been run on a Mac.** It is the only part of this work that has not been.
+This has never been run on a Mac. It is the only part of this work that has not been.
 
 Everything below was tested here, on Linux, against the real `odisplay` binary:
 
-- `internal/cli` — every call the app makes: the argv arrays, the environment, reading
+- `internal/cli`: every call the app makes, the argv arrays, the environment, reading
   `list --json`, the exit codes and what each one means. It runs against the real program and a
   scratch settings file, so it is the contract rather than a mock of it.
-- `internal/panel` — what the menu says, which item is ticked, what clicking one would do, where
+- `internal/panel`: what the menu says, which item is ticked, what clicking one would do, where
   the separators fall. No drawing, so it is checkable without a screen.
 - `internal/` type-checks with `GOOS=darwin`.
 
@@ -289,7 +289,7 @@ of that.
 ### One difference from the Omarchy panel
 
 `mxswitch`, which moves the devices on macOS, takes no device name. It picks the device itself and
-prefers a mouse, and moves one per call. So **the mouse goes first on macOS**, where the panel sends
+prefers a mouse, and moves one per call. So the mouse goes first on macOS, where the panel sends
 the mouse last so the pointer is still here if the keyboard move is what failed.
 
 That is a property of the tool rather than of either front end, and splitting them would not fix

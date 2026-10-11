@@ -15,16 +15,28 @@ import (
 // it runs, by using a key the settings do not have.
 
 // realBinary finds the odisplay built alongside this app, or skips.
+// realBinary is the odisplay these tests drive, looked for the way the app
+// looks for it.
+//
+// It used to fall back to a path on the machine it was written on, which made
+// every test here skip on any other one and report success without having run.
+// A suite that quietly tests nothing is worse than one that fails.
 func realBinary(t *testing.T) string {
 	t.Helper()
-	path := os.Getenv("ODISPLAY_BIN")
-	if path == "" {
-		path = "/home/arch/.local/bin/odisplay"
+	if path := os.Getenv("ODISPLAY_BIN"); path != "" {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("ODISPLAY_BIN is set to %s, which is not there", path)
+		}
+		return path
 	}
-	if _, err := os.Stat(path); err != nil {
-		t.Skipf("odisplay is not built at %s", path)
+	for _, path := range Candidates() {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
 	}
-	return path
+	t.Skipf("odisplay is not installed. Build it, or set ODISPLAY_BIN. Looked in %s",
+		strings.Join(Candidates(), ", "))
+	return ""
 }
 
 // scratch writes a settings file and points ODISPLAY_CONFIG at it.
