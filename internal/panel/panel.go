@@ -31,6 +31,8 @@ const (
 	// ActionSetHost records a channel. It only writes the setting; nothing
 	// moves until that input is switched to.
 	ActionSetHost
+	// ActionRename asks for a new name for an input and records it.
+	ActionRename
 	// ActionSetDisplay records which display this machine switches. It only
 	// writes the setting; nothing moves until an input is switched to.
 	ActionSetDisplay
@@ -260,12 +262,29 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 		m.Items = append(m.Items, hostItem)
 	}
 
-	displayItem := &Item{
-		Title:           "Display",
-		Tooltip:         "Which display this machine switches",
+	renameItem := &Item{
+		Title:           "Rename",
+		Tooltip:         "Give an input a name of your own",
 		Action:          ActionNone,
 		Disabled:        busy,
 		SeparatorBefore: true,
+	}
+	for _, in := range s.Inputs {
+		renameItem.Children = append(renameItem.Children, &Item{
+			Title:    in.Label() + "…",
+			Tooltip:  "Rename " + in.Label(),
+			Action:   ActionRename,
+			Key:      in.Key,
+			Disabled: busy,
+		})
+	}
+	m.Items = append(m.Items, renameItem)
+
+	displayItem := &Item{
+		Title:    "Display",
+		Tooltip:  "Which display this machine switches",
+		Action:   ActionNone,
+		Disabled: busy,
 	}
 	for _, n := range DisplayChoices {
 		displayItem.Children = append(displayItem.Children, &Item{

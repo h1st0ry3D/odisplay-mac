@@ -371,3 +371,71 @@ func TestTheNotInstalledMenuKeepsAReload(t *testing.T) {
 		t.Errorf("no way to look again without restarting:\n%s", m.Describe())
 	}
 }
+
+// Renaming has to be reachable per input, the same as the panel's right-click.
+//
+// It cannot be a child of the input's own item: a menu item with children
+// cannot also be clicked, and that item is the switch. So it is a submenu of
+// its own, one entry per input, each carrying the key it would rename.
+func TestRenameOffersOneEntryPerInput(t *testing.T) {
+	m := Build(settings(), Idle, false)
+	rename := find(m, "Rename")
+	if rename == nil {
+		t.Fatalf("no rename entry:\n%s", m.Describe())
+	}
+	if len(rename.Children) != len(settings().Inputs) {
+		t.Fatalf("entries = %d, want %d", len(rename.Children), len(settings().Inputs))
+	}
+	keys := map[string]bool{}
+	for i, c := range rename.Children {
+		if c.Action != ActionRename {
+			t.Errorf("%q has action %v", c.Title, c.Action)
+		}
+		if c.Key == "" {
+			t.Errorf("%q carries no key, so it would rename nothing", c.Title)
+		}
+		keys[c.Key] = true
+		if !strings.HasSuffix(c.Title, "…") {
+			t.Errorf("%q does not hint at a prompt", c.Title)
+		}
+		// Named after what the input is called now, so the right one is picked
+		// without knowing the keys.
+		if !strings.HasPrefix(c.Title, settings().Inputs[i].Label()) {
+			t.Errorf("%q does not name the input it renames", c.Title)
+		}
+	}
+	for _, want := range []string{"usbc", "dp", "hdmi"} {
+		if !keys[want] {
+			t.Errorf("no rename entry for %q", want)
+		}
+	}
+}
+
+// An unnamed input is labelled by its key everywhere else, and the rename entry
+// has to match or it would look like a different input.
+func TestRenameEntryUsesTheSameLabelAsTheRow(t *testing.T) {
+	s := cli.Settings{Inputs: []cli.Input{{Key: "dp", VCP: 15}}}
+	m := Build(s, Idle, false)
+	rename := find(m, "Rename")
+	if rename == nil {
+		t.Fatal("no rename entry")
+	}
+	if got := rename.Children[0].Title; got != "dp…" {
+		t.Errorf("rename entry = %q, want it to match the row's label", got)
+	}
+}
+
+func TestRenameIsDisabledWhileBusy(t *testing.T) {
+	rename := find(Build(settings(), Idle, true), "Rename")
+	if rename == nil {
+		t.Fatal("no rename entry")
+	}
+	if !rename.Disabled {
+		t.Error("the rename menu is clickable while busy")
+	}
+	for _, c := range rename.Children {
+		if !c.Disabled {
+			t.Errorf("%q is clickable while busy", c.Title)
+		}
+	}
+}

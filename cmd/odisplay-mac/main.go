@@ -18,13 +18,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"strconv"
+	"strings"
 	"sync"
 
 	"fyne.io/systray"
 
 	"github.com/h1st0ry3D/odisplay-mac/internal/cli"
+	"github.com/h1st0ry3D/odisplay-mac/internal/dialog"
 	"github.com/h1st0ry3D/odisplay-mac/internal/icon"
 	"github.com/h1st0ry3D/odisplay-mac/internal/panel"
 )
@@ -61,6 +64,9 @@ type app struct {
 	builtFor []string
 	statusIt *systray.MenuItem
 	rows     []*row
+	// renameIt is the rename submenu, one entry per input.
+	renameIt     *systray.MenuItem
+	renameChoice map[string]*systray.MenuItem
 	// displayIt is the picker and its choices, kept so the tick can move and
 	// the title can name the number in force.
 	displayIt     *systray.MenuItem
@@ -176,6 +182,16 @@ func (a *app) render() {
 	if a.statusIt != nil {
 		a.statusIt.SetTitle(model.Status.Text)
 		a.statusIt.SetTooltip(model.Status.Text)
+	}
+
+	if a.renameIt != nil {
+		setEnabled(a.renameIt, !busy)
+		for _, in := range settings.Inputs {
+			if c := a.renameChoice[in.Key]; c != nil {
+				c.SetTitle(in.Label() + "…")
+				setEnabled(c, !busy)
+			}
+		}
 	}
 
 	if a.displayIt != nil {
@@ -305,6 +321,17 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string) {
 
 	keep(a.addLabel(""))
 
+	a.renameIt = keep(systray.AddMenuItem("Rename", "Give an input a name of your own"))
+	a.renameChoice = map[string]*systray.MenuItem{}
+	if installed {
+		for _, in := range inputs {
+			c := a.renameIt.AddSubMenuItem(in.Label()+"…", "Rename "+in.Label())
+			a.renameChoice[in.Key] = c
+			a.wire(c, panel.ActionRename, in.Key, "", 0)
+		}
+	}
+	setEnabled(a.renameIt, installed)
+
 	a.displayIt = keep(systray.AddMenuItem("Display", "Which display this machine switches"))
 	a.displayChoice = map[int]*systray.MenuItem{}
 	for _, n := range panel.DisplayChoices {
@@ -377,6 +404,27 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 		a.setStatus(panel.ForSetting(res,
 			"Keyboard and mouse for "+label+" set to "+panel.HostLabel(host)+"."))
 
+	case panel.ActionRename:
+		in, ok := inputByKey(settings, key)
+		if !ok {
+			break
+		}
+		// The dialog is the whole interaction. Dismissing it is an answer, so
+		// it leaves both the name and the line alone rather than reporting
+		// that nothing happened.
+		name, asked, err := dialog.Ask(ctx,
+			"Name for this input. Empty restores the default.", in.Name)
+		if err != nil || !asked {
+			if err != nil && !errors.Is(err, dialog.ErrCancelled) {
+				log.Printf("rename dialog: %v", err)
+				a.setStatus(panel.Status{Text: "Could not open the rename dialog.", Error: true})
+			}
+			break
+		}
+		log.Printf("renaming %s to %q", key, name)
+		res := client.SetName(ctx, key, name)
+		a.setStatus(panel.ForSetting(res, "Renamed to "+nameOr(in, name)+"."))
+
 	case panel.ActionSetDisplay:
 		log.Printf("setting the display to %d", display)
 		res := client.SetDisplay(ctx, display)
@@ -397,11 +445,29 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 	a.reload()
 }
 
+// nameOr is what the status line says after a rename. An empty name means the
+// built-in label is back, so saying "Renamed to ." would read as a failure.
+func nameOr(in cli.Input, name string) string {
+	if strings.TrimSpace(name) == "" {
+		return in.Key + " (default)"
+	}
+	return name
+}
+
 func labelFor(s cli.Settings, key string) string {
-	for _, in := range s.Inputs {
-		if in.Key == key {
-			return in.Label()
-		}
+	if in, ok := inputByKey(s, key); ok {
+		return in.Label()
 	}
 	return key
+}
+
+// inputByKey finds one input, so a caller does not have to walk the list and
+// then remember whether it found anything.
+func inputByKey(s cli.Settings, key string) (cli.Input, bool) {
+	for _, in := range s.Inputs {
+		if in.Key == key {
+			return in, true
+		}
+	}
+	return cli.Input{}, false
 }

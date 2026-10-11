@@ -24,10 +24,25 @@ Mac Mini
 PC
   Keyboard and mouse: off  ▸
 ──────────────────────────
+Rename
+  USB-C…                   ▸
+  Mac Mini…                ▸
+  PC…                      ▸
 Display: 1                 ▸
 ──────────────────────────
 Quit
 ```
+
+**Rename** asks for a new name for one input and records it with `odisplay set name`, so it is the
+same setting the Omarchy panel's right-click edits and the same file holds it. Emptying the field
+restores the built-in label.
+
+It is a submenu rather than part of the input's own row because a menu item with children cannot
+also be clicked, and that row is the switch.
+
+The prompt is a real macOS dialog, through `osascript`, rather than a window this app draws: it is
+keyboard navigable, it follows the system theme, and it is what a menu bar app is expected to do.
+Dismissing it changes nothing and says nothing, because changing your mind is an answer.
 
 The display picker under the inputs offers `display 1` through `4` — labelled with whichever program
 this Mac actually uses, `m1ddc` or `ddcctl` — with a tick on the number in force. The same list and
