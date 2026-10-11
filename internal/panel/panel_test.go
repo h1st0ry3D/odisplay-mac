@@ -36,9 +36,9 @@ func TestEveryInputGetsItsOwnNameAndHostControl(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"Keyboard and mouse: off",
-		"Keyboard and mouse: 3",
-		"Keyboard and mouse: off",
+		"EasySwitch: off",
+		"EasySwitch: 3",
+		"EasySwitch: off",
 	} {
 		if find(m, want) == nil {
 			t.Errorf("no host control reading %q", want)
@@ -65,7 +65,7 @@ func TestTheUsersNameIsWhatShows(t *testing.T) {
 // what is about to happen before making it happen.
 func TestTheTickIsOnTheChannelInForce(t *testing.T) {
 	m := Build(settings(), Idle, false)
-	host := find(m, "Keyboard and mouse: 3")
+	host := find(m, "EasySwitch: 3")
 	if host == nil {
 		t.Fatal("no host control for Mac Mini")
 	}
@@ -90,7 +90,7 @@ func TestTheTickIsOnTheChannelInForce(t *testing.T) {
 // absence of one, so it is listed like any other rather than hidden.
 func TestEveryChannelIsOffered(t *testing.T) {
 	m := Build(settings(), Idle, false)
-	host := find(m, "Keyboard and mouse: off")
+	host := find(m, "EasySwitch: off")
 	if host == nil {
 		t.Fatal("no host control")
 	}
@@ -106,7 +106,7 @@ func TestEveryChannelIsOffered(t *testing.T) {
 
 func TestClickingAChannelSaysWhichKeyAndWhichChannel(t *testing.T) {
 	m := Build(settings(), Idle, false)
-	host := find(m, "Keyboard and mouse: 3")
+	host := find(m, "EasySwitch: 3")
 	for _, c := range host.Children {
 		if c.Action != ActionSetHost {
 			t.Errorf("%q has action %v, want ActionSetHost", c.Title, c.Action)
@@ -437,5 +437,41 @@ func TestRenameIsDisabledWhileBusy(t *testing.T) {
 		if !c.Disabled {
 			t.Errorf("%q is clickable while busy", c.Title)
 		}
+	}
+}
+
+// The label is written once and read by both the model and the code that puts
+// items on screen. Two copies drifted before, which is why it moved here.
+func TestTheHostLabelSaysEasySwitch(t *testing.T) {
+	for host, want := range map[string]string{
+		"0": "EasySwitch: off",
+		"1": "EasySwitch: 1",
+		"2": "EasySwitch: 2",
+		"3": "EasySwitch: 3",
+		"":  "EasySwitch: off",
+	} {
+		if got := HostTitle(host); got != want {
+			t.Errorf("HostTitle(%q) = %q, want %q", host, got, want)
+		}
+	}
+}
+
+// And the menu uses it, so a change here cannot miss a row.
+func TestEveryHostControlUsesTheSameLabel(t *testing.T) {
+	m := Build(settings(), Idle, false)
+	found := 0
+	for _, it := range m.Items {
+		if strings.HasPrefix(it.Title, "EasySwitch: ") {
+			found++
+			if len(it.Children) != len(Hosts) {
+				t.Errorf("%q has %d choices, want %d", it.Title, len(it.Children), len(Hosts))
+			}
+		}
+		if strings.Contains(it.Title, "Keyboard and mouse") {
+			t.Errorf("the old label is still on %q", it.Title)
+		}
+	}
+	if found != len(settings().Inputs) {
+		t.Errorf("%d EasySwitch controls, want one per input (%d)", found, len(settings().Inputs))
 	}
 }

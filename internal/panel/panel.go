@@ -112,6 +112,15 @@ func HostLabel(host string) string {
 	return host
 }
 
+// HostTitle is what the Easy-Switch control reads when it is closed.
+//
+// One place, because it was written out in both the model and the code that
+// puts items on screen, and two copies of a label drift the moment one of them
+// is edited.
+func HostTitle(host string) string {
+	return "EasySwitch: " + HostLabel(host)
+}
+
 // HostMeaning is the longer sentence, which is what the submenu item carries.
 func HostMeaning(host string) string {
 	if host == "0" || host == "" {
@@ -238,7 +247,7 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 		})
 
 		hostItem := &Item{
-			Title:           "Keyboard and mouse: " + HostLabel(host),
+			Title:           HostTitle(host),
 			Tooltip:         HostMeaning(host),
 			Action:          ActionSetHost,
 			Key:             in.Key,

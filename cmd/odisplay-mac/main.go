@@ -221,7 +221,7 @@ func (a *app) render() {
 			setEnabled(r.label, !busy)
 		}
 		if r.host != nil {
-			r.host.SetTitle("Keyboard and mouse: " + panel.HostLabel(host))
+			r.host.SetTitle(panel.HostTitle(host))
 			r.host.SetTooltip(panel.HostMeaning(host))
 			setEnabled(r.host, !busy)
 		}
@@ -307,7 +307,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string) {
 			a.wire(r.label, panel.ActionSwitch, in.Key, "", 0)
 
 			r.host = keep(systray.AddMenuItem(
-				"Keyboard and mouse: "+panel.HostLabel(in.HostChannel()),
+				panel.HostTitle(in.HostChannel()),
 				panel.HostMeaning(in.HostChannel())))
 			for _, h := range panel.Hosts {
 				c := r.host.AddSubMenuItemCheckbox(
@@ -402,7 +402,7 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 		log.Printf("setting %s host to %s", key, host)
 		res := client.SetHost(ctx, key, host)
 		a.setStatus(panel.ForSetting(res,
-			"Keyboard and mouse for "+label+" set to "+panel.HostLabel(host)+"."))
+			"EasySwitch for "+label+" set to "+panel.HostLabel(host)+"."))
 
 	case panel.ActionRename:
 		in, ok := inputByKey(settings, key)

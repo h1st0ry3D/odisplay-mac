@@ -18,11 +18,11 @@ leaves it alone for a light one, with no second file.
 Sent Mac Mini, devices on host 3.
 ──────────────────────────
 X
-  Keyboard and mouse: off  ▸
+  EasySwitch: off          ▸
 Mac Mini
-  Keyboard and mouse: 3    ▸
+  EasySwitch: 3            ▸
 PC
-  Keyboard and mouse: off  ▸
+  EasySwitch: off          ▸
 ──────────────────────────
 Rename
   USB-C…                   ▸
