@@ -290,6 +290,32 @@ mv build/Odisplay.app /Applications/
 Rebuilding replaces the app, so re-check Input Monitoring afterwards if a switch stops moving the
 devices.
 
+## Keyboard shortcuts
+
+The app takes no keys of its own, so a shortcut needs something that does. Either
+way the line is the same call the menu item makes, so a key and a click cannot
+disagree about what a switch does.
+
+[skhd](https://github.com/koekeishiya/skhd) is a hotkey daemon and the closest
+equivalent to the Omarchy panel's bindings, where the window manager owns the
+keys. `brew install skhd`, start it with `brew services start skhd`, then in
+`~/.config/skhd/skhdrc`:
+
+```
+ctrl + alt - 1 : ~/.local/bin/odisplay switch usbc
+ctrl + alt - 2 : ~/.local/bin/odisplay switch dp
+ctrl + alt - 3 : ~/.local/bin/odisplay switch hdmi
+```
+
+macOS's own Shortcuts app does the same thing with a Run Shell Script action
+holding one of those lines and a shortcut assigned to it, if you would rather not
+run a daemon. Name the binary by its full path either way: a daemon started at
+login does not necessarily have `~/.local/bin` on its `PATH`.
+
+The argument is the input's `key` in the settings file rather than its position,
+the same one the Omarchy bindings use, so the shortcuts on both machines are the
+same list. `odisplay list` prints them.
+
 ## Settings
 
 The same file the CLI uses, so both machines can share it:
