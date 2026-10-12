@@ -100,7 +100,7 @@ func onReady() {
 	// and the second is what other platforms would draw.
 	systray.SetTemplateIcon(icon.TV(), icon.TV())
 	systray.SetTitle("")
-	systray.SetTooltip("Odisplay — switch the monitor and the keyboard and mouse")
+	systray.SetTooltip("Odisplay: switch the monitor and the keyboard and mouse")
 
 	state.reload()
 }

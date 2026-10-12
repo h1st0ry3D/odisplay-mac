@@ -69,18 +69,17 @@ One block per input. The input's own name is the top item, and clicking it switc
 under it opens the Easy-Switch channels, with a tick on the one that is in force, so you can see
 what a switch will do before you make one.
 
-Power is the second line of that block, under the channel, because those two are the two things a
-switch does. It decides what this Mac does with itself once the keyboard and mouse have gone: Awake
-leaves it running, Sleep suspends it, and Shutdown powers it off, with a tick on the one in force.
+Power is the second line of each block. A switch sends the keyboard and mouse, and this is what this
+Mac then does with itself: Awake leaves it running, Sleep suspends it, and Shutdown powers it off,
+with a tick on the one in force.
 
 It runs last, after the monitor and after every device, and only if all of them succeeded. Sleeping
 first would leave the display never moved and the keyboard and mouse still here, which is the one
 ordering this app exists to keep. A display that did not move, or a device that did not, leaves this
 Mac exactly as it is.
 
-A failure of the action is exit 5 rather than 3, because it is the only one where your keyboard and
-mouse are where you wanted them. Sending someone to look for a keyboard that is not lost would be
-worse than saying the machine did not sleep.
+A failed action exits 5 rather than 3, because it is the only failure where your keyboard and mouse
+are where you wanted them. Exit 3 means the keyboard did not follow, and the app says that instead.
 
 Sleep works for the logged-in user. Shutdown needs root, and there is no way to ask for it from a
 menu bar item, so it goes through `sudo -n`, which fails at once instead of waiting on a password

@@ -33,7 +33,7 @@ func TestTheIconIsSquare(t *testing.T) {
 //
 // The check is for a concrete type that carries alpha rather than a range of
 // them, because the point is to fail if the asset is ever regenerated as a
-// plain grayscale PNG — which is exactly what the first render of this was.
+// plain grayscale PNG, which is exactly what the first render of this was.
 func TestTheIconCarriesAlpha(t *testing.T) {
 	img, err := png.Decode(bytes.NewReader(TV()))
 	if err != nil {

@@ -31,23 +31,23 @@ src/DDC.c:0
 
 It never touches the keyboard or mouse. What it does use:
 
-- `IOKit/IOKitLib.h` and `IOKit/graphics/IOGraphicsLib.h` — find the display's framebuffer
-- `IOI2CInterface` — send DDC/CI requests to the monitor over the video cable
-- `AppKit/NSScreen.h` — enumerate displays
+- `IOKit/IOKitLib.h` and `IOKit/graphics/IOGraphicsLib.h`: find the display's framebuffer
+- `IOI2CInterface`: send DDC/CI requests to the monitor over the video cable
+- `AppKit/NSScreen.h`: enumerate displays
 
 No sockets, no `popen`, no `system`, no `exec`, no file writes. The only data it sends is the DDC
 command you asked for, down the display cable.
 
 **Established:** 1958 stars, first commit 2014, GPL-3.0. Last commit November 2022, and the project
-describes itself as being in maintenance mode — which for something that talks to hardware over a
-frozen interface is reasonable rather than abandoned.
+describes itself as being in maintenance mode. For something that talks to hardware over a frozen
+interface, that is reasonable rather than abandoned.
 
 **Note:** it does exclude DPMS toggling. The source has a comment that the `-p` flag used to brick
 monitors and is now a no-op
 ([issue #89](https://github.com/kfix/ddcctl/issues/89)). Only the input-source path matters here,
 and that one is intact.
 
-**Does it need any permission at all?** Its source requests no TCC-gated API — no accessibility, no
+**Does it need any permission at all?** Its source requests no TCC-gated API: no accessibility, no
 screen recording, no HID. Whether it needs `sudo` depends on your Mac and port, but that is an
 IOKit access question, not a privacy prompt.
 
@@ -101,7 +101,7 @@ calls in it:
    still need. On a normal run the database is unreadable under SIP, and it falls back to the
    preflight call.
 
-2. `/usr/bin/open 'x-apple.systempreferences:...'` — opens the Input Monitoring pane for you.
+2. `/usr/bin/open 'x-apple.systempreferences:...'`: opens the Input Monitoring pane for you.
 
 ### Concerns worth stating
 
@@ -114,8 +114,8 @@ Mitigations that are in your hands: build it yourself from the source you read r
 binary someone else built, and pin the commit. `git clone` then `git checkout <sha>` before `make`.
 
 **It uses `popen` and `system`, which fork a shell.** The interpolated value is the binary's own
-path from `_NSGetExecutablePath`, and single quotes are escaped for the SQL string — but the path
-also lands inside a double-quoted shell context, where `$`, backticks and backslashes would be
+path from `_NSGetExecutablePath`, and single quotes are escaped for the SQL string, but the path also
+lands inside a double-quoted shell context, where `$`, backticks and backslashes would be
 expanded. A path containing those would misbehave. You control that path, so this is a hardening
 nit rather than a hole, and it is the one thing in either program I would fix.
 
@@ -123,12 +123,12 @@ nit rather than a hole, and it is the one thing in either program I would fix.
 
 Both files were read in full, and searched for:
 
-- network calls — `socket`, `connect`, `curl`, `NSURL`, `CFURL`, `http`
-- process spawning — `popen`, `system`, `exec*`, `fork`
-- file writes — `fopen`, `fwrite`, `unlink`, `rename`, `chmod`
-- TCC-gated APIs — `CGPreflightListenEventAccess`, `CGRequestListenEventAccess`,
+- network calls: `socket`, `connect`, `curl`, `NSURL`, `CFURL`, `http`
+- process spawning: `popen`, `system`, `exec*`, `fork`
+- file writes: `fopen`, `fwrite`, `unlink`, `rename`, `chmod`
+- TCC-gated APIs: `CGPreflightListenEventAccess`, `CGRequestListenEventAccess`,
   `AXIsProcessTrusted`, `CGEventTap`, `ScreenCaptureKit`
-- hidden payloads — long base64 or hex string literals
+- hidden payloads: long base64 or hex string literals
 
 `mxswitch.c` had no base64 or hex blob, no network call, and no file write. `ddcctl` had no
 TCC-gated API and no HID access at all.
@@ -137,7 +137,7 @@ TCC-gated API and no HID access at all.
 
 You do not have to grant Input Monitoring to use the display half. Only the Easy-Switch feature
 needs it. Set every input's channel to `off` and `odisplay-mac` will switch the monitor and leave
-the keyboard and mouse alone — no HID access, no prompt.
+the keyboard and mouse alone: no HID access, no prompt.
 
 If you want the devices to follow but not with `mxswitch`, the alternative is Logi's own Options+,
 which is a much larger and closed program that you would be trusting instead. You could also write
