@@ -19,8 +19,8 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -36,55 +36,6 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("odisplay-mac: ")
 	systray.Run(onReady, func() {})
-}
-
-// row is one input's two items, kept so they can be edited in place.
-type row struct {
-	key    string
-	label  *systray.MenuItem
-	host   *systray.MenuItem
-	choice map[string]*systray.MenuItem
-	// power is what this Mac does afterwards, under the channel control.
-	power       *systray.MenuItem
-	powerChoice map[string]*systray.MenuItem
-}
-
-// app is the live state.
-//
-// systray runs its callbacks on its own goroutine, and a switch can take the
-// length of a Solaar timeout, so the state and the drawing are kept apart by
-// one mutex rather than by hoping.
-type app struct {
-	mu       sync.Mutex
-	client   *cli.Client
-	settings cli.Settings
-	status   panel.Status
-	busy     bool
-
-	// built is what is on screen, so a rebuild can tell a shape change from a
-	// value change.
-	built    bool
-	builtFor []string
-	statusIt *systray.MenuItem
-	// statusLines are the reason a switch failed and any advice about it.
-	statusLines []*systray.MenuItem
-	rows        []*row
-	// renameIt is the rename submenu, one entry per input.
-	renameIt     *systray.MenuItem
-	renameChoice map[string]*systray.MenuItem
-	// hideIt is the hide submenu, one entry per input including the hidden
-	// ones, which is the only place they appear.
-	hideIt     *systray.MenuItem
-	hideChoice map[string]*systray.MenuItem
-	// displayIt is the picker and its choices, kept so the tick can move and
-	// the title can name the number in force.
-	displayIt     *systray.MenuItem
-	displayChoice map[int]*systray.MenuItem
-	reloadIt      *systray.MenuItem
-	quitIt        *systray.MenuItem
-	// all is every item on screen, in the order it appears, so a rebuild can
-	// take the whole menu down before putting a new one up.
-	all []*systray.MenuItem
 }
 
 var state = &app{status: panel.Idle}
@@ -144,158 +95,6 @@ func (a *app) setStatus(s panel.Status) {
 	a.mu.Unlock()
 	a.render()
 }
-
-// shape is what a menu is built for: which inputs, or none if odisplay is not
-// there. Two settings with the same shape can be drawn by editing titles.
-func shape(keys []string, installed bool, extraLines int) []string {
-	if !installed {
-		out := []string{"<not installed>"}
-		for i := 0; i < extraLines; i++ {
-			out = append(out, "<reason>")
-		}
-		return out
-	}
-	out := append([]string(nil), keys...)
-	// How many lines a failure adds is part of the shape, so one appearing or
-	// clearing costs a rebuild. Their text is not, so a different message does
-	// not.
-	for i := 0; i < extraLines; i++ {
-		out = append(out, "<reason>")
-	}
-	return out
-}
-
-// render brings the menu up to date.
-//
-// In place where it can, rebuilt where it must: the shape is stable for
-// everything that happens in normal use, so only a settings edit that adds or
-// removes an input costs a rebuild.
-//
-// Everything it needs is taken under one lock and then used without it. The
-// calls below add and edit menu items, which is not something to do while
-// holding a mutex the rest of the program wants.
-func (a *app) render() {
-	a.mu.Lock()
-	settings, status, busy := a.settings, a.status, a.busy
-	installed := a.client != nil
-	shown := settings.Visible()
-	keys := make([]string, 0, len(shown))
-	for _, in := range shown {
-		keys = append(keys, in.Key)
-	}
-	a.mu.Unlock()
-
-	lines := statusLines(status)
-	want := shape(keys, installed, len(lines))
-	if !a.built || !sameShape(a.builtFor, want) {
-		a.rebuild(installed, settings.Inputs, settings.MonitorOr(), len(lines))
-	}
-	a.built, a.builtFor = true, want
-
-	if !installed {
-		return
-	}
-
-	model := panel.Build(settings, status, busy)
-
-	a.statusIt.SetTitle(model.Status.Text)
-	a.statusIt.SetTooltip(model.Status.Text)
-	for i, it := range a.statusLines {
-		it.SetTitle(lines[i])
-		it.SetTooltip(lines[i])
-	}
-
-	if a.renameIt != nil {
-		setEnabled(a.renameIt, !busy)
-		for _, in := range settings.Inputs {
-			if c := a.renameChoice[in.Key]; c != nil {
-				c.SetTitle(in.Label() + "…")
-				setEnabled(c, !busy)
-			}
-		}
-	}
-
-	if a.hideIt != nil {
-		setEnabled(a.hideIt, !busy)
-		for _, in := range settings.Inputs {
-			c := a.hideChoice[in.Key]
-			if c == nil {
-				continue
-			}
-			c.SetTitle(in.Label())
-			c.SetTooltip(panel.HiddenTooltip(in))
-			if in.Hidden {
-				c.Check()
-			} else {
-				c.Uncheck()
-			}
-			setEnabled(c, !busy)
-		}
-	}
-
-	if a.displayIt != nil {
-		a.displayIt.SetTitle("Display: " + strconv.Itoa(settings.Display))
-		setEnabled(a.displayIt, !busy)
-		for n, item := range a.displayChoice {
-			if n == settings.Display {
-				item.Check()
-			} else {
-				item.Uncheck()
-			}
-			setEnabled(item, !busy)
-		}
-	}
-
-	for _, r := range a.rows {
-		in, _ := inputByKey(settings, r.key)
-		host := in.HostChannel()
-		r.label.SetTitle(in.Label())
-		setEnabled(r.label, !busy)
-		r.host.SetTitle(panel.HostTitle(host))
-		r.host.SetTooltip(panel.HostMeaning(host))
-		setEnabled(r.host, !busy)
-		for h, item := range r.choice {
-			if h == host {
-				item.Check()
-			} else {
-				item.Uncheck()
-			}
-			setEnabled(item, !busy)
-		}
-
-		if r.power != nil {
-			r.power.SetTitle(panel.PowerTitle(in.Power))
-			setEnabled(r.power, !busy)
-			for _, choice := range panel.PowerChoices {
-				item, ok := r.powerChoice[choice.Value]
-				if !ok {
-					continue
-				}
-				if choice.Value == in.Power {
-					item.Check()
-				} else {
-					item.Uncheck()
-				}
-				setEnabled(item, !busy)
-			}
-		}
-	}
-}
-
-// statusLines are the lines under the status itself: the reason a switch gave
-// up, and any advice about it. One function, so the count the menu is built
-// from and the text put into it cannot disagree.
-func statusLines(st panel.Status) []string {
-	var out []string
-	if d := oneLine(st.Detail); d != "" {
-		out = append(out, d)
-	}
-	if h := oneLine(st.Hint); h != "" {
-		out = append(out, h)
-	}
-	return out
-}
-
 func setEnabled(it *systray.MenuItem, enabled bool) {
 	if enabled {
 		it.Enable()
@@ -317,123 +116,185 @@ func sameShape(a, b []string) bool {
 	return true
 }
 
-// rebuild takes the menu down and builds it again.
+// app is the live state.
 //
-// Removal rather than hiding, because a hidden item is still an item the native
-// menu holds. Removing an item also closes its click channel, so the goroutine
-// waiting on it ends rather than waiting on something nobody can click.
-// A rebuild only happens when the shape changes, which is when the settings
-// gain or lose an input, or odisplay appears or disappears.
+// systray runs its callbacks on its own goroutine, and a switch can take the
+// length of a Solaar timeout, so the state and the drawing are kept apart by
+// one mutex rather than by hoping.
+type app struct {
+	mu       sync.Mutex
+	client   *cli.Client
+	settings cli.Settings
+	status   panel.Status
+	busy     bool
+
+	// drawn is the shape of the model that is on screen. The menu is rebuilt
+	// only when that changes, because a rebuild closes whatever submenu is
+	// open, and a switch changes the status text on every click.
+	drawn []string
+	// roots are the items a rebuild takes down, and all is every item in the
+	// order the model walks, which is how a render finds one again to edit it.
+	roots []*systray.MenuItem
+	all   []*systray.MenuItem
+}
+
+// render puts the current state on screen.
 //
-// Everything is rebuilt, Quit included, because systray only appends. Keeping
-// one item across a rebuild would leave it above everything added after it.
-//
-// Each item is created and recorded on the next line, in the order it should
-// appear, because the order of these calls is the order of the menu. Keeping
-// that readable matters more here than anywhere else in this program: it is the
-// part no test on another platform can reach.
-func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines int) {
-	for _, it := range a.all {
-		it.Remove()
-	}
-	a.all = nil
-	a.rows = nil
+// There is one description of this menu, in the panel package, and this draws
+// it. The Omarchy panel draws the same model in its own way, so a change to what
+// a row says cannot reach one front end and miss the other.
+func (a *app) render() {
+	a.mu.Lock()
+	settings, status, busy, installed := a.settings, a.status, a.busy, a.client != nil
+	a.mu.Unlock()
 
-	// keep records an item and returns it, so a line is one call and one thing
-	// to remember rather than two.
-	keep := func(it *systray.MenuItem) *systray.MenuItem {
-		a.all = append(a.all, it)
-		return it
-	}
-
-	a.statusIt = keep(a.addLabel(panel.Idle.Text))
-	// Right under the status line, where the Omarchy panel puts it too.
-	a.statusLines = nil
-	for i := 0; i < lines; i++ {
-		a.statusLines = append(a.statusLines, keep(a.addLabel("")))
-	}
-
-	if !installed {
-		for _, path := range cli.Candidates() {
-			keep(a.addLabel(path))
-		}
+	var model *panel.Model
+	if installed {
+		model = panel.Build(settings, status, busy)
 	} else {
-		for _, in := range visible(inputs) {
-			keep(a.addLabel(""))
+		model = panel.NotInstalled(cli.Candidates())
+	}
 
-			r := &row{key: in.Key, choice: map[string]*systray.MenuItem{}}
-			r.label = keep(systray.AddMenuItem(in.Label(),
-				"Switch the monitor to "+in.Label()))
-			a.wire(r.label, call{action: panel.ActionSwitch, key: in.Key})
+	want := shapeOf(model.Items)
+	if !sameShape(a.drawn, want) {
+		for _, it := range a.roots {
+			it.Remove()
+		}
+		a.draw(model)
+		a.drawn = want
+	}
+	apply(model, a.all)
+}
 
-			r.host = keep(systray.AddMenuItem(
-				panel.HostTitle(in.HostChannel()),
-				panel.HostMeaning(in.HostChannel())))
-			for _, h := range panel.Hosts {
-				c := r.host.AddSubMenuItemCheckbox(
-					panel.HostLabel(h), panel.HostMeaning(h), false)
-				r.choice[h] = c
-				a.wire(c, call{action: panel.ActionSetHost, key: in.Key, host: h})
+// draw puts the model on screen in one depth-first walk, recording every item it
+// makes so a later render can find it again.
+//
+// roots is what a rebuild takes down, which is only the top level: a menu bar
+// removes a submenu with the entry it hangs from. all is every item, in the
+// order the model walks, which is the order apply reads them back in.
+func (a *app) draw(model *panel.Model) {
+	a.roots, a.all = nil, nil
+
+	keep := func(parent *systray.MenuItem, item *systray.MenuItem) {
+		a.all = append(a.all, item)
+		if parent == nil {
+			a.roots = append(a.roots, item)
+		}
+	}
+
+	var walk func(parent *systray.MenuItem, items []*panel.Item)
+	walk = func(parent *systray.MenuItem, items []*panel.Item) {
+		for _, it := range items {
+			if it.SeparatorBefore {
+				keep(parent, a.blank(parent))
 			}
+			item := a.create(parent, it)
+			keep(parent, item)
+			a.wire(item, callOf(it))
+			walk(item, it.Children)
+		}
+	}
+	walk(nil, model.Items)
 
-			r.power = keep(systray.AddMenuItem(panel.PowerTitle(in.Power),
-				"What this Mac does once the switch is done"))
-			r.powerChoice = map[string]*systray.MenuItem{}
-			for _, choice := range panel.PowerChoices {
-				c := r.power.AddSubMenuItemCheckbox(
-					choice.Label, choice.Why, choice.Value == in.Power)
-				r.powerChoice[choice.Value] = c
-				a.wire(c, call{action: panel.ActionSetPower, key: in.Key, power: choice.Value})
+	log.Printf("menu rebuilt: %s", model.Summary())
+}
+
+// create makes one item from the model.
+func (a *app) create(parent *systray.MenuItem, it *panel.Item) *systray.MenuItem {
+	var item *systray.MenuItem
+	switch {
+	case parent == nil:
+		item = systray.AddMenuItem(it.Title, it.Tooltip)
+	case it.Checkable:
+		item = parent.AddSubMenuItemCheckbox(it.Title, it.Tooltip, it.Checked)
+	default:
+		item = parent.AddSubMenuItem(it.Title, it.Tooltip)
+	}
+	setEnabled(item, !it.Disabled)
+	return item
+}
+
+// blank is the line between blocks. A menu bar has no separator of its own for
+// this, so it is an empty item that cannot be clicked.
+func (a *app) blank(parent *systray.MenuItem) *systray.MenuItem {
+	var item *systray.MenuItem
+	if parent == nil {
+		item = systray.AddMenuItem("", "")
+	} else {
+		item = parent.AddSubMenuItem("", "")
+	}
+	setEnabled(item, false)
+	return item
+}
+
+// callOf is what clicking an item does. The model carries every argument the
+// action needs, which is why this is a copy and not a lookup by key.
+func callOf(it *panel.Item) call {
+	return call{
+		action:  it.Action,
+		key:     it.Key,
+		host:    it.Host,
+		display: it.Display,
+		power:   it.Power,
+	}
+}
+
+// apply gives every item on screen what the model says it should have.
+//
+// The two are walked the same way, so the nth item of the walk is the nth on
+// screen, which the shape check is what keeps true. A title is set on the item
+// that is there rather than the item replaced, so a new status message does not
+// close the submenu the click came from.
+func apply(model *panel.Model, live []*systray.MenuItem) {
+	at := 0
+	var walk func(items []*panel.Item)
+	walk = func(items []*panel.Item) {
+		for _, it := range items {
+			if it.SeparatorBefore {
+				at++ // the blank item above has nothing to set
 			}
-			a.rows = append(a.rows, r)
+			if at >= len(live) {
+				return
+			}
+			item := live[at]
+			at++
+			item.SetTitle(it.Title)
+			item.SetTooltip(it.Tooltip)
+			setEnabled(item, !it.Disabled)
+			if it.Checkable {
+				if it.Checked {
+					item.Check()
+				} else {
+					item.Uncheck()
+				}
+			}
+			walk(it.Children)
 		}
 	}
+	walk(model.Items)
+}
 
-	keep(a.addLabel(""))
-
-	a.renameIt = keep(systray.AddMenuItem("Rename", "Give an input a name of your own"))
-	a.renameChoice = map[string]*systray.MenuItem{}
-	if installed {
-		for _, in := range inputs {
-			c := a.renameIt.AddSubMenuItem(in.Label()+"…", "Rename "+in.Label())
-			a.renameChoice[in.Key] = c
-			a.wire(c, call{action: panel.ActionRename, key: in.Key})
+// shapeOf is the structure of a menu: one line per item, in the order it is
+// walked, saying where it sits and what it is.
+//
+// What it is means what clicking it does and what it does that to, so that
+// reordering two inputs is a different shape. A title is deliberately not part
+// of it: a title changes on every switch and on every rename, and a menu
+// rebuilt for one would close the submenu the click came from. That is what
+// apply is for.
+func shapeOf(items []*panel.Item) []string {
+	var out []string
+	var walk func(items []*panel.Item, depth int)
+	walk = func(items []*panel.Item, depth int) {
+		for _, it := range items {
+			out = append(out, fmt.Sprintf("%d %d %s %s %d %s %t %t %d",
+				depth, int(it.Action), it.Key, it.Host, it.Display, it.Power,
+				it.Checkable, it.SeparatorBefore, len(it.Children)))
+			walk(it.Children, depth+1)
 		}
 	}
-	setEnabled(a.renameIt, installed)
-
-	a.hideIt = keep(systray.AddMenuItem("Hide", "Keep an input out of this menu without removing it"))
-	a.hideChoice = map[string]*systray.MenuItem{}
-	if installed {
-		for _, in := range inputs {
-			c := a.hideIt.AddSubMenuItemCheckbox(in.Label(), panel.HiddenTooltip(in), in.Hidden)
-			a.hideChoice[in.Key] = c
-			a.wire(c, call{action: panel.ActionToggleHidden, key: in.Key})
-		}
-	}
-	setEnabled(a.hideIt, installed)
-
-	a.displayIt = keep(systray.AddMenuItem("Display", "Which display this machine switches"))
-	a.displayChoice = map[int]*systray.MenuItem{}
-	for _, n := range panel.DisplayChoices {
-		c := a.displayIt.AddSubMenuItemCheckbox(
-			panel.DisplayTitle(monitor, n),
-			"Switch this monitor, numbered "+strconv.Itoa(n)+" on this machine", false)
-		a.displayChoice[n] = c
-		a.wire(c, call{action: panel.ActionSetDisplay, display: n})
-	}
-
-	a.quitIt = keep(systray.AddMenuItem("Quit",
-		"Leave Odisplay. Nothing is switched on the way out."))
-	go func(item *systray.MenuItem) {
-		for range item.ClickedCh {
-			log.Println("quitting")
-			systray.Quit()
-			return
-		}
-	}(a.quitIt)
-
-	log.Printf("menu rebuilt: %d inputs, installed=%v", len(inputs), installed)
+	walk(items, 0)
+	return out
 }
 
 // call is everything a menu item needs to say what it does when clicked.
@@ -458,20 +319,26 @@ func (a *app) wire(item *systray.MenuItem, c call) {
 	}()
 }
 
-// addLabel adds an item nobody can click: a heading, or the blank line that
-// stands in for a separator, which systray has no call for.
-func (a *app) addLabel(title string) *systray.MenuItem {
-	it := systray.AddMenuItem(title, "")
-	it.Disable()
-	return it
-}
-
 // run does one thing, then brings the menu up to date.
 //
 // busy is what keeps two switches from overlapping. On a keyboard and mouse an
 // interleaved pair leaves one machine with the pointer and the other with
 // nothing.
 func (a *app) run(c call) {
+	// The two that work with nothing driving the menu. The menu shown when
+	// odisplay is missing offers a reload, because nothing else re-reads once
+	// it appears, and quit has to work in that state too.
+	switch c.action {
+	case panel.ActionQuit:
+		log.Println("quitting")
+		systray.Quit()
+		return
+	case panel.ActionReload:
+		a.setStatus(panel.Idle)
+		a.reload()
+		return
+	}
+
 	action, key, host, display := c.action, c.key, c.host, c.display
 	a.mu.Lock()
 	if a.busy || a.client == nil {
@@ -561,9 +428,6 @@ func (a *app) run(c call) {
 		a.setStatus(panel.ForSetting(res,
 			"Switching "+panel.DisplayTitle(settings.MonitorOr(), display)+" from now on."))
 
-	case panel.ActionReload:
-		log.Println("reloading settings")
-		a.setStatus(panel.Idle)
 	}
 
 	a.mu.Lock()
@@ -594,18 +458,6 @@ func withHint(st panel.Status, res cli.Result) panel.Status {
 		"the app is rebuilt. Remove Odisplay from Privacy & Security > Input Monitoring " +
 		"and add it again."
 	return st
-}
-
-// visible is the inputs whose rows are shown, which is also what the menu is
-// shaped from.
-func visible(inputs []cli.Input) []cli.Input {
-	out := make([]cli.Input, 0, len(inputs))
-	for _, in := range inputs {
-		if !in.Hidden {
-			out = append(out, in)
-		}
-	}
-	return out
 }
 
 // oneLine shortens a message to something a menu item can hold. A menu item

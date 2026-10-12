@@ -97,6 +97,9 @@ Nothing else is granted.
 The top line reports the last switch and is kept in one piece: `Sent Mac Mini, devices on host 3.`
 or, when it went wrong, why.
 
+With no odisplay to drive it, the menu says so and lists the directories it looked in, with a
+Reload item, because nothing else re-reads once the binary is put there.
+
 ## What it deliberately does not do
 
 It does not decide the order things happen in. That belongs to `odisplay`, and it is the one rule

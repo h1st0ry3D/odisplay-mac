@@ -57,6 +57,11 @@ type Item struct {
 	Tooltip string
 	// Checked draws a tick.
 	Checked bool
+	// Checkable makes it a checkbox rather than an ordinary entry, so a tick
+	// has somewhere to go. It is not inferred from Checked: an unticked
+	// checkbox and an ordinary entry are different things on screen, and
+	// systray cannot change one into the other once it is made.
+	Checkable bool
 	// Disabled greys it out and makes it do nothing. Headings and the last
 	// result line are like this.
 	Disabled bool
@@ -325,9 +330,11 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 		})
 
 		hostItem := &Item{
-			Title:           HostTitle(host),
-			Tooltip:         HostMeaning(host),
-			Action:          ActionSetHost,
+			Title:   HostTitle(host),
+			Tooltip: HostMeaning(host),
+			// A submenu heading cannot be clicked, so the action belongs on the
+			// entries inside it. The other three headings are the same.
+			Action:          ActionNone,
 			Key:             in.Key,
 			Disabled:        busy,
 			SeparatorBefore: false,
@@ -339,11 +346,12 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 				// The tick is on the channel in force, which is the same rule
 				// as the panel's cycle button: reading it is how you know what
 				// a switch will do before you make one.
-				Checked:  h == host,
-				Action:   ActionSetHost,
-				Key:      in.Key,
-				Host:     h,
-				Disabled: busy,
+				Checked:   h == host,
+				Checkable: true,
+				Action:    ActionSetHost,
+				Key:       in.Key,
+				Host:      h,
+				Disabled:  busy,
 			})
 		}
 		m.Items = append(m.Items, hostItem)
@@ -364,11 +372,12 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 				// Ticked on the action in force, like the channels and the
 				// display number. This one has a consequence and runs last, so
 				// which is set is worth reading without clicking.
-				Checked:  choice.Value == in.Power,
-				Action:   ActionSetPower,
-				Key:      in.Key,
-				Power:    choice.Value,
-				Disabled: busy,
+				Checked:   choice.Value == in.Power,
+				Checkable: true,
+				Action:    ActionSetPower,
+				Key:       in.Key,
+				Power:     choice.Value,
+				Disabled:  busy,
 			})
 		}
 		m.Items = append(m.Items, powerItem)
@@ -406,10 +415,11 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 			Tooltip: HiddenTooltip(in),
 			// Ticked where it is hidden, so what is hidden is readable without
 			// clicking anything. Same control as the display picker.
-			Checked:  in.Hidden,
-			Action:   ActionToggleHidden,
-			Key:      in.Key,
-			Disabled: busy,
+			Checked:   in.Hidden,
+			Checkable: true,
+			Action:    ActionToggleHidden,
+			Key:       in.Key,
+			Disabled:  busy,
 		})
 	}
 	m.Items = append(m.Items, hideItem)
@@ -426,10 +436,11 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 			Tooltip: "Switch this monitor, numbered " + strconv.Itoa(n) + " on this machine",
 			// The tick is on the number in force, so which one a switch will
 			// use is readable without making one. Same rule as the channels.
-			Checked:  n == s.Display,
-			Action:   ActionSetDisplay,
-			Display:  n,
-			Disabled: busy,
+			Checked:   n == s.Display,
+			Checkable: true,
+			Action:    ActionSetDisplay,
+			Display:   n,
+			Disabled:  busy,
 		})
 	}
 	displayItem.Title = displayItem.Title + ": " + strconv.Itoa(s.Display)

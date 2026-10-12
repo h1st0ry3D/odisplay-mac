@@ -773,3 +773,45 @@ func TestTheReadmeDrawsTheMenuAsItIs(t *testing.T) {
 			channels, powers)
 	}
 }
+
+// systray cannot turn an ordinary entry into a checkbox once it is made, so the
+// model has to say which entries are tickable before the menu is built. Every
+// group that carries a tick is checked here, so one that gains a tick and
+// forgets the flag is a failing test rather than a choice with nowhere to put
+// it.
+func TestTheEntriesThatCarryATickAreCheckable(t *testing.T) {
+	ticks := 0
+	var walk func(items []*Item)
+	walk = func(items []*Item) {
+		for _, it := range items {
+			// A submenu heading cannot be clicked, so it carries no action and
+			// no tick, and is not one of these.
+			leaf := len(it.Children) == 0
+			if it.Checked {
+				ticks++
+				if !it.Checkable {
+					t.Errorf("%q is ticked and is not a checkbox", it.Title)
+				}
+			}
+			switch {
+			case !leaf:
+			case it.Action == ActionSetHost, it.Action == ActionSetPower,
+				it.Action == ActionToggleHidden, it.Action == ActionSetDisplay:
+				if !it.Checkable {
+					t.Errorf("%q writes a setting that is read back as a tick, so it has to be a checkbox",
+						it.Title)
+				}
+			case it.Action == ActionRename:
+				// Renaming opens a dialog. A tick beside it would mean nothing.
+				if it.Checkable {
+					t.Errorf("%q opens a dialog and must not be a checkbox", it.Title)
+				}
+			}
+			walk(it.Children)
+		}
+	}
+	walk(Build(settings(), Idle, false).Items)
+	if ticks == 0 {
+		t.Error("nothing in the menu is ticked, so this checked nothing")
+	}
+}
