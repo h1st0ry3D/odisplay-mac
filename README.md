@@ -312,6 +312,14 @@ holding one of those lines and a shortcut assigned to it, if you would rather no
 run a daemon. Name the binary by its full path either way: a daemon started at
 login does not necessarily have `~/.local/bin` on its `PATH`.
 
+Whichever program runs that line is the one macOS asks for Input Monitoring, and
+the grant it records belongs to that program. Permissions follow the app that
+started the process rather than the tool at the end of it that opens the device,
+so a hotkey daemon running the command means granting the daemon, and running it
+by hand in a terminal means granting the terminal. Using the menu items avoids
+this entirely: the app runs the command itself, and it already holds the grant,
+which is also the grant it loses on a rebuild.
+
 The argument is the input's `key` in the settings file rather than its position,
 the same one the Omarchy bindings use, so the shortcuts on both machines are the
 same list. `odisplay list` prints them.
