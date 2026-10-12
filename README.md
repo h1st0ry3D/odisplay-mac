@@ -19,10 +19,13 @@ Sent Mac Mini, devices on host 3.
 ──────────────────────────
 X
   EasySwitch: off          ▸
+  Power: Awake             ▸
 Mac Mini
   EasySwitch: 3            ▸
+  Power: Sleep             ▸
 PC
   EasySwitch: off          ▸
+  Power: Shutdown          ▸
 ──────────────────────────
 Rename
   USB-C…                   ▸
@@ -32,10 +35,6 @@ Hide
   USB-C                    ▸
   Mac Mini                 ▸
   PC                       ▸
-Power: Awake               ▸
-  Awake
-  Sleep
-  Shutdown
 Display: 1                 ▸
 ──────────────────────────
 Quit
@@ -70,6 +69,26 @@ One block per input. The input's own name is the top item, and clicking it switc
 under it opens the Easy-Switch channels, with a tick on the one that is in force, so you can see
 what a switch will do before you make one.
 
+Power is the second line of that block, under the channel, because those two are the two things a
+switch does. It decides what this Mac does with itself once the keyboard and mouse have gone: Awake
+leaves it running, Sleep suspends it, and Shutdown powers it off, with a tick on the one in force.
+
+It runs last, after the monitor and after every device, and only if all of them succeeded. Sleeping
+first would leave the display never moved and the keyboard and mouse still here, which is the one
+ordering this app exists to keep. A display that did not move, or a device that did not, leaves this
+Mac exactly as it is.
+
+A failure of the action is exit 5 rather than 3, because it is the only one where your keyboard and
+mouse are where you wanted them. Sending someone to look for a keyboard that is not lost would be
+worse than saying the machine did not sleep.
+
+Sleep works for the logged-in user. Shutdown needs root and there is no way to ask for it from a
+menu bar item, so it goes through `sudo -n`, which fails at once instead of waiting on a password
+prompt nobody can reach. One line in `sudoers` makes it work, for that command only, added with
+`sudo visudo`:
+
+    yourname ALL=(root) NOPASSWD: /sbin/shutdown -h now
+
 The top line reports the last switch and is kept in one piece: `Sent Mac Mini, devices on host 3.`
 or, when it went wrong, why.
 
@@ -96,7 +115,8 @@ that input is switched to.
 | macOS | [`mxswitch`](https://github.com/marcocosta97/mxswitch) | Moves the keyboard and mouse | Only for the Easy-Switch channels |
 | Build | Go 1.22 or newer | Building both of the above | To build |
 
-Nothing here needs `sudo`. Without Input Monitoring the monitor still switches, and the app says
+Nothing here needs `sudo` to build or to run, with one exception: picking Shutdown needs a rule
+allowing that single command. Without Input Monitoring the monitor still switches, and the app says
 the devices did not move rather than pretending.
 
 You do not have to grant it to use the display half. Set every input's channel to `off` and the

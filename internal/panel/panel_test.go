@@ -1,6 +1,7 @@
 package panel
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -725,5 +726,50 @@ func TestThePowerChoicesAreTheThreeStates(t *testing.T) {
 	}
 	if strings.Join(labels, ",") != "Awake,Sleep,Shutdown" {
 		t.Errorf("labels = %v, want Awake, Sleep and Shutdown", labels)
+	}
+}
+
+// The README draws the menu, and it drifted: it still showed one Power control
+// grouped with Hide after the feature had become one per input. A drawing that
+// disagrees with the menu is worse than none, because it is read instead of the
+// code. This is the narrow part that drifted, so it is the narrow part checked.
+func TestTheReadmeDrawsTheMenuAsItIs(t *testing.T) {
+	raw, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The first fenced block is the menu.
+	body := string(raw)
+	start := strings.Index(body, "```\n")
+	if start < 0 {
+		t.Fatal("the README has no menu block")
+	}
+	rest := body[start+4:]
+	end := strings.Index(rest, "```")
+	if end < 0 {
+		t.Fatal("the README's menu block is not closed")
+	}
+	lines := strings.Split(rest[:end], "\n")
+
+	// Every channel line is followed by its input's Power line, and no Power
+	// line stands anywhere else.
+	channels, powers := 0, 0
+	for i, line := range lines {
+		switch {
+		case strings.HasPrefix(line, "  EasySwitch:"):
+			channels++
+			if i+1 >= len(lines) || !strings.HasPrefix(lines[i+1], "  Power: ") {
+				t.Errorf("the README's diagram has no Power line under %q", line)
+			}
+		case strings.HasPrefix(line, "  Power: "):
+			powers++
+			if i == 0 || !strings.HasPrefix(lines[i-1], "  EasySwitch:") {
+				t.Errorf("the README draws %q as a standalone menu, not under an input", line)
+			}
+		}
+	}
+	if channels == 0 || channels != powers {
+		t.Errorf("the README draws %d channels and %d Power controls, want the same number, one each",
+			channels, powers)
 	}
 }
