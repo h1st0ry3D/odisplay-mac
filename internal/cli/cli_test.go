@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -15,7 +17,63 @@ import (
 // Nothing here can move a monitor or a device. Every switch is refused before
 // it runs, by using a key the settings do not have.
 
-// realBinary finds the odisplay built alongside this app, or skips.
+// asked is the part of odisplay's interface this app depends on: the settings
+// it reads and writes, in odisplay's own words.
+var asked = []string{"set name", "set host", "set display", "set hidden", "set power"}
+
+// TestMain asks what odisplay can do before any test runs.
+//
+// This app is a front end for odisplay, so one too old to know a setting it
+// writes is the same kind of problem as no odisplay at all, except that it does
+// not look like one: a test fails with `unknown field "power"`, which reads as a
+// bug in whichever of the two you happen to be looking at. Asked once, before
+// anything else, is somewhere a message can say what to do about it.
+//
+// No odisplay is not an error. Those tests skip, and say so.
+func TestMain(m *testing.M) {
+	if err := checkOdisplay(); err != nil {
+		fmt.Fprintln(os.Stderr, "\n"+err.Error())
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
+
+// checkOdisplay reads the usage odisplay prints and confirms it lists every
+// setting this app writes.
+func checkOdisplay() error {
+	path, ok := lookup()
+	if !ok {
+		return nil
+	}
+	out, err := exec.Command(path, "help").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("could not ask %s what it can do: %v\n%s", path, err, out)
+	}
+	for _, call := range asked {
+		if strings.Contains(string(out), "\n  odisplay "+call) {
+			continue
+		}
+		return fmt.Errorf("the odisplay at %s does not know about %q, so it is older than this app.\n"+
+			"Rebuild it and run this again:\n\n"+
+			"    cd odisplay-cli && git pull\n"+
+			"    go build -trimpath -o ~/.local/bin/odisplay ./cmd/odisplay", path, call)
+	}
+	return nil
+}
+
+// lookup is odisplay as the app would find it, and whether there is one.
+func lookup() (string, bool) {
+	if path := os.Getenv("ODISPLAY_BIN"); path != "" {
+		return path, true
+	}
+	for _, path := range Candidates() {
+		if _, err := os.Stat(path); err == nil {
+			return path, true
+		}
+	}
+	return "", false
+}
+
 // realBinary is the odisplay these tests drive, looked for the way the app
 // looks for it.
 //
@@ -30,10 +88,8 @@ func realBinary(t *testing.T) string {
 		}
 		return path
 	}
-	for _, path := range Candidates() {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
+	if path, ok := lookup(); ok {
+		return path
 	}
 	t.Skipf("odisplay is not installed. Build it, or set ODISPLAY_BIN. Looked in %s",
 		strings.Join(Candidates(), ", "))

@@ -181,6 +181,16 @@ cd odisplay-mac
 
 That runs the tests first, then builds `build/Odisplay.app`.
 
+The tests drive the odisplay you have installed rather than a mock of it, so
+building this app wants a current one. An odisplay from before the app was last
+changed fails them, saying which setting it does not know, and the build stops
+there. If that happens:
+
+```sh
+cd odisplay-cli && git pull
+go build -trimpath -o ~/.local/bin/odisplay ./cmd/odisplay
+```
+
 It is a bundle rather than a bare binary on purpose: macOS gives a menu bar app a Dock icon and no
 stable identity without one, and permissions are granted per bundle.
 
