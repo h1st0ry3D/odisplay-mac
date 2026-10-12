@@ -290,35 +290,44 @@ mv build/Odisplay.app /Applications/
 Rebuilding replaces the app, so re-check Input Monitoring afterwards if a switch stops moving the
 devices.
 
-## Keyboard shortcuts
+## Shortcuts
 
-The app takes no keys of its own, so a shortcut needs something that does. Either
-way the line is the same call the menu item makes, so a key and a click cannot
-disagree about what a switch does.
+A key that switches is one call to `odisplay switch`, which is the same call the
+menu items make, so a shortcut cannot disagree with the menu about what a switch
+does. Three ways to get one, all running the same line.
 
-[skhd](https://github.com/koekeishiya/skhd) is a hotkey daemon and the closest
-equivalent to the Omarchy panel's bindings, where the window manager owns the
-keys. `brew install skhd`, start it with `brew services start skhd`, then in
-`~/.config/skhd/skhdrc`:
+**BetterTouchTool.** A keyboard shortcut trigger with the `Execute Shell Script`
+action, which runs the script itself:
 
-```
-ctrl + alt - 1 : ~/.local/bin/odisplay switch usbc
-ctrl + alt - 2 : ~/.local/bin/odisplay switch dp
-ctrl + alt - 3 : ~/.local/bin/odisplay switch hdmi
+```sh
+$HOME/.local/bin/odisplay switch usbc
 ```
 
-macOS's own Shortcuts app does the same thing with a Run Shell Script action
-holding one of those lines and a shortcut assigned to it, if you would rather not
-run a daemon. Name the binary by its full path either way: a daemon started at
-login does not necessarily have `~/.local/bin` on its `PATH`.
+**skhd**, the closest equivalent to what the Omarchy panel uses, where the window
+manager owns the keys. `brew install skhd`, start it with
+`brew services start skhd`, then in `~/.config/skhd/skhdrc`:
 
-Whichever program runs that line is the one macOS asks for Input Monitoring, and
+```
+ctrl + alt - 1 : $HOME/.local/bin/odisplay switch usbc
+```
+
+**Shortcuts**, with a Run Shell Script action holding the same line and a
+keyboard shortcut assigned to it, if you would rather not run a daemon.
+
+Name the binary by its full path, as above. A daemon started at login does not
+necessarily have `~/.local/bin` on its `PATH`.
+
+Whichever program runs the line is the one macOS asks for Input Monitoring, and
 the grant it records belongs to that program. Permissions follow the app that
 started the process rather than the tool at the end of it that opens the device,
-so a hotkey daemon running the command means granting the daemon, and running it
-by hand in a terminal means granting the terminal. Using the menu items avoids
-this entirely: the app runs the command itself, and it already holds the grant,
-which is also the grant it loses on a rebuild.
+so a shortcut that runs the command in a terminal needs the grant on the
+terminal, while the menu items need nothing new. To see which app a shortcut is
+attributed to, point the shortcut at `/bin/sleep 30` for a moment, press it, and
+read:
+
+```sh
+sudo launchctl procinfo $(pgrep -x sleep | head -1) | grep responsible
+```
 
 The argument is the input's `key` in the settings file rather than its position,
 the same one the Omarchy bindings use, so the shortcuts on both machines are the
