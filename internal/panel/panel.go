@@ -36,6 +36,9 @@ const (
 	// ActionToggleHidden shows or hides an input. Nothing is switched, so it
 	// is safe to do to the input that is in use.
 	ActionToggleHidden
+	// ActionSetPower records what this Mac does with itself after a switch
+	// sends the keyboard and mouse away.
+	ActionSetPower
 	// ActionSetDisplay records which display this machine switches. It only
 	// writes the setting; nothing moves until an input is switched to.
 	ActionSetDisplay
@@ -70,6 +73,8 @@ type Item struct {
 	Host string
 	// Display is the number an ActionSetDisplay will write.
 	Display int
+	// Power is the action an ActionSetPower will write.
+	Power string
 	// StatusDetail marks the line carrying the reason a switch failed, which is
 	// not an input's row and has no action of its own.
 	StatusDetail bool
@@ -115,6 +120,33 @@ func HiddenTooltip(in cli.Input) string {
 		return "Show " + in.Label() + " in this menu again"
 	}
 	return "Hide " + in.Label() + " from this menu"
+}
+
+// PowerChoices are the actions offered, in the order they are listed. The first
+// is what a file that never mentions power means.
+//
+// "Awake" rather than "nothing", because a list of one thing the machine does
+// and two things it does not reads badly, and the label is answering what the
+// Mac will be doing.
+var PowerChoices = []struct {
+	Value string
+	Label string
+	Why   string
+}{
+	{"", "Awake", "Leave this Mac running"},
+	{"sleep", "Sleep", "Suspend this Mac once the switch is done"},
+	{"shutdown", "Shutdown", "Power this Mac off once the switch is done"},
+}
+
+// PowerTitle is what the control reads when it is closed.
+func PowerTitle(action string) string {
+	for _, c := range PowerChoices {
+		if c.Value == action {
+			return "Power: " + c.Label
+		}
+	}
+	// A value this does not know is one odisplay reads as doing nothing.
+	return "Power: " + PowerChoices[0].Label
 }
 
 // DisplayTitle is what one choice in the picker reads.
@@ -315,6 +347,31 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 			})
 		}
 		m.Items = append(m.Items, hostItem)
+
+		// Under the channel, because the two are the two things a switch does:
+		// send the keyboard and mouse, then decide what becomes of this
+		// machine.
+		powerItem := &Item{
+			Title:    PowerTitle(in.Power),
+			Tooltip:  "What this Mac does once the switch is done",
+			Action:   ActionNone,
+			Disabled: busy,
+		}
+		for _, choice := range PowerChoices {
+			powerItem.Children = append(powerItem.Children, &Item{
+				Title:   choice.Label,
+				Tooltip: choice.Why,
+				// Ticked on the action in force, like the channels and the
+				// display number. This one has a consequence and runs last, so
+				// which is set is worth reading without clicking.
+				Checked:  choice.Value == in.Power,
+				Action:   ActionSetPower,
+				Key:      in.Key,
+				Power:    choice.Value,
+				Disabled: busy,
+			})
+		}
+		m.Items = append(m.Items, powerItem)
 	}
 
 	renameItem := &Item{

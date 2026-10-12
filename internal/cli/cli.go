@@ -59,6 +59,9 @@ type Input struct {
 	// Hidden keeps this input out of the menu without removing it. The Hide
 	// submenu is the one place it still appears, so it can be brought back.
 	Hidden bool `json:"hidden"`
+	// Power is what this Mac does with itself after a switch sends the keyboard
+	// and mouse away. Empty means nothing, which is the default.
+	Power string `json:"power"`
 }
 
 // Host returns the channel, with an absent or unusable value read as off.
@@ -341,6 +344,15 @@ func (c *Client) SetHidden(ctx context.Context, key string, hidden bool) Result 
 		word = "on"
 	}
 	res, _ := c.run(ctx, "set", "hidden", key, word)
+	return res
+}
+
+// SetPower records what this Mac does with itself after switching away.
+func (c *Client) SetPower(ctx context.Context, key, action string) Result {
+	if action == "" {
+		action = "none"
+	}
+	res, _ := c.run(ctx, "set", "power", key, action)
 	return res
 }
 

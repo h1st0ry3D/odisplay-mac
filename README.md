@@ -32,6 +32,10 @@ Hide
   USB-C                    ▸
   Mac Mini                 ▸
   PC                       ▸
+Power: Awake               ▸
+  Awake
+  Sleep
+  Shutdown
 Display: 1                 ▸
 ──────────────────────────
 Quit

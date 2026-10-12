@@ -44,6 +44,9 @@ type row struct {
 	label  *systray.MenuItem
 	host   *systray.MenuItem
 	choice map[string]*systray.MenuItem
+	// power is what this Mac does afterwards, under the channel control.
+	power       *systray.MenuItem
+	powerChoice map[string]*systray.MenuItem
 }
 
 // app is the live state.
@@ -259,6 +262,23 @@ func (a *app) render() {
 			}
 			setEnabled(item, !busy)
 		}
+
+		if r.power != nil {
+			r.power.SetTitle(panel.PowerTitle(in.Power))
+			setEnabled(r.power, !busy)
+			for _, choice := range panel.PowerChoices {
+				item, ok := r.powerChoice[choice.Value]
+				if !ok {
+					continue
+				}
+				if choice.Value == in.Power {
+					item.Check()
+				} else {
+					item.Uncheck()
+				}
+				setEnabled(item, !busy)
+			}
+		}
 	}
 }
 
@@ -344,7 +364,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines 
 			r := &row{key: in.Key, choice: map[string]*systray.MenuItem{}}
 			r.label = keep(systray.AddMenuItem(in.Label(),
 				"Switch the monitor to "+in.Label()))
-			a.wire(r.label, panel.ActionSwitch, in.Key, "", 0)
+			a.wire(r.label, call{action: panel.ActionSwitch, key: in.Key})
 
 			r.host = keep(systray.AddMenuItem(
 				panel.HostTitle(in.HostChannel()),
@@ -353,7 +373,17 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines 
 				c := r.host.AddSubMenuItemCheckbox(
 					panel.HostLabel(h), panel.HostMeaning(h), false)
 				r.choice[h] = c
-				a.wire(c, panel.ActionSetHost, in.Key, h, 0)
+				a.wire(c, call{action: panel.ActionSetHost, key: in.Key, host: h})
+			}
+
+			r.power = keep(systray.AddMenuItem(panel.PowerTitle(in.Power),
+				"What this Mac does once the switch is done"))
+			r.powerChoice = map[string]*systray.MenuItem{}
+			for _, choice := range panel.PowerChoices {
+				c := r.power.AddSubMenuItemCheckbox(
+					choice.Label, choice.Why, choice.Value == in.Power)
+				r.powerChoice[choice.Value] = c
+				a.wire(c, call{action: panel.ActionSetPower, key: in.Key, power: choice.Value})
 			}
 			a.rows = append(a.rows, r)
 		}
@@ -367,7 +397,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines 
 		for _, in := range inputs {
 			c := a.renameIt.AddSubMenuItem(in.Label()+"…", "Rename "+in.Label())
 			a.renameChoice[in.Key] = c
-			a.wire(c, panel.ActionRename, in.Key, "", 0)
+			a.wire(c, call{action: panel.ActionRename, key: in.Key})
 		}
 	}
 	setEnabled(a.renameIt, installed)
@@ -378,7 +408,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines 
 		for _, in := range inputs {
 			c := a.hideIt.AddSubMenuItemCheckbox(in.Label(), panel.HiddenTooltip(in), in.Hidden)
 			a.hideChoice[in.Key] = c
-			a.wire(c, panel.ActionToggleHidden, in.Key, "", 0)
+			a.wire(c, call{action: panel.ActionToggleHidden, key: in.Key})
 		}
 	}
 	setEnabled(a.hideIt, installed)
@@ -390,7 +420,7 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines 
 			panel.DisplayTitle(monitor, n),
 			"Switch this monitor, numbered "+strconv.Itoa(n)+" on this machine", false)
 		a.displayChoice[n] = c
-		a.wire(c, panel.ActionSetDisplay, "", "", n)
+		a.wire(c, call{action: panel.ActionSetDisplay, display: n})
 	}
 
 	a.quitIt = keep(systray.AddMenuItem("Quit",
@@ -406,11 +436,24 @@ func (a *app) rebuild(installed bool, inputs []cli.Input, monitor string, lines 
 	log.Printf("menu rebuilt: %d inputs, installed=%v", len(inputs), installed)
 }
 
+// call is everything a menu item needs to say what it does when clicked.
+//
+// One value rather than five parameters: four of them are strings that mean
+// different things, and a call site that got two of them the wrong way round
+// would still compile.
+type call struct {
+	action  panel.Action
+	key     string
+	host    string
+	display int
+	power   string
+}
+
 // wire sends every click on an item to run.
-func (a *app) wire(item *systray.MenuItem, action panel.Action, key, host string, display int) {
+func (a *app) wire(item *systray.MenuItem, c call) {
 	go func() {
 		for range item.ClickedCh {
-			a.run(action, key, host, display)
+			a.run(c)
 		}
 	}()
 }
@@ -428,7 +471,8 @@ func (a *app) addLabel(title string) *systray.MenuItem {
 // busy is what keeps two switches from overlapping. On a keyboard and mouse an
 // interleaved pair leaves one machine with the pointer and the other with
 // nothing.
-func (a *app) run(action panel.Action, key, host string, display int) {
+func (a *app) run(c call) {
+	action, key, host, display := c.action, c.key, c.host, c.display
 	a.mu.Lock()
 	if a.busy || a.client == nil {
 		a.mu.Unlock()
@@ -496,6 +540,18 @@ func (a *app) run(action panel.Action, key, host string, display int) {
 		what := in.Label() + " shown in the menu again."
 		if !in.Hidden {
 			what = in.Label() + " hidden from the menu."
+		}
+		a.setStatus(panel.ForSetting(res, what))
+
+	case panel.ActionSetPower:
+		log.Printf("power=%q for %s", c.power, key)
+		res := client.SetPower(ctx, key, c.power)
+		what := "This Mac will stay awake."
+		switch c.power {
+		case "sleep":
+			what = "This Mac will sleep after a switch."
+		case "shutdown":
+			what = "This Mac will shut down after a switch."
 		}
 		a.setStatus(panel.ForSetting(res, what))
 

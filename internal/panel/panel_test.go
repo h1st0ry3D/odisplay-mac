@@ -615,3 +615,115 @@ func TestHidingEveryInputLeavesAUsableMenu(t *testing.T) {
 		t.Error("inputs exist but the menu says there are none")
 	}
 }
+
+// Every input gets a Power control under its channel, because the two are the
+// two things a switch does: send the keyboard and mouse, then decide what
+// becomes of this machine.
+func TestEveryInputHasAPowerControl(t *testing.T) {
+	m := Build(settings(), Idle, false)
+	controls := 0
+	for _, it := range m.Items {
+		if !strings.HasPrefix(it.Title, "Power: ") {
+			continue
+		}
+		controls++
+		if len(it.Children) != len(PowerChoices) {
+			t.Errorf("%q has %d choices, want %d", it.Title, len(it.Children), len(PowerChoices))
+		}
+	}
+	if controls != len(settings().Inputs) {
+		t.Errorf("%d Power controls, want one per input (%d)", controls, len(settings().Inputs))
+	}
+}
+
+// It sits directly under the channel control of the same input, not grouped
+// with the others somewhere else.
+func TestPowerSitsUnderItsOwnChannel(t *testing.T) {
+	m := Build(settings(), Idle, false)
+	var order []string
+	for _, it := range m.Items {
+		switch {
+		case strings.HasPrefix(it.Title, "EasySwitch: "):
+			order = append(order, "channel")
+		case strings.HasPrefix(it.Title, "Power: "):
+			order = append(order, "power")
+		}
+	}
+	want := []string{"channel", "power", "channel", "power", "channel", "power"}
+	if strings.Join(order, ",") != strings.Join(want, ",") {
+		t.Errorf("order = %v, want %v", order, want)
+	}
+}
+
+// Nothing set reads as Awake, and it is ticked, so a menu nobody has configured
+// says what the machine will do rather than leaving a blank.
+func TestTheActionInForceIsTicked(t *testing.T) {
+	cases := []struct{ power, label string }{
+		{"", "Awake"},
+		{"sleep", "Sleep"},
+		{"shutdown", "Shutdown"},
+	}
+	for _, c := range cases {
+		s := settings()
+		s.Inputs[0].Power = c.power
+		m := Build(s, Idle, false)
+		item := find(m, "Power: "+c.label)
+		if item == nil {
+			t.Errorf("power %q has no control reading %q:\n%s", c.power, c.label, m.Describe())
+			continue
+		}
+		ticked := 0
+		for _, choice := range item.Children {
+			if choice.Checked {
+				ticked++
+				if choice.Power != c.power {
+					t.Errorf("power %q ticked %q", c.power, choice.Power)
+				}
+			}
+		}
+		if ticked != 1 {
+			t.Errorf("power %q has %d ticks, want one", c.power, ticked)
+		}
+	}
+}
+
+// A value odisplay would read as doing nothing reads as Awake here too, rather
+// than as a fourth state nobody can select again.
+func TestAnUnknownActionReadsAsAwake(t *testing.T) {
+	if got := PowerTitle("hibernate"); got != "Power: Awake" {
+		t.Errorf("PowerTitle(hibernate) = %q, want Awake", got)
+	}
+	s := settings()
+	s.Inputs[0].Power = "hibernate"
+	if find(Build(s, Idle, false), "Power: Awake") == nil {
+		t.Error("an unknown action leaves the control unlabelled")
+	}
+}
+
+func TestPowerIsDisabledWhileBusy(t *testing.T) {
+	m := Build(settings(), Idle, true)
+	for _, it := range m.Items {
+		if !strings.HasPrefix(it.Title, "Power: ") {
+			continue
+		}
+		if !it.Disabled {
+			t.Errorf("%q is clickable while busy", it.Title)
+		}
+		for _, c := range it.Children {
+			if !c.Disabled {
+				t.Errorf("%q is clickable while busy", c.Title)
+			}
+		}
+	}
+}
+
+// The wording is the machine's, because that is what the setting is about.
+func TestThePowerChoicesAreTheThreeStates(t *testing.T) {
+	var labels []string
+	for _, c := range PowerChoices {
+		labels = append(labels, c.Label)
+	}
+	if strings.Join(labels, ",") != "Awake,Sleep,Shutdown" {
+		t.Errorf("labels = %v, want Awake, Sleep and Shutdown", labels)
+	}
+}

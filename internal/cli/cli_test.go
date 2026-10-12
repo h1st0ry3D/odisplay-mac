@@ -534,3 +534,36 @@ func TestSettingAnImpossibleDisplayIsRefused(t *testing.T) {
 		t.Errorf("display = %d, want it left at 1", s.Display)
 	}
 }
+
+func TestSettingTheActionWritesAndReadsBack(t *testing.T) {
+	c := scratch(t, oneInput)
+	for _, action := range []string{"sleep", "shutdown", "none"} {
+		if res := c.SetPower(context.Background(), "dp", action); res.Code != 0 {
+			t.Fatalf("set power %s: %d %s", action, res.Code, res.Detail)
+		}
+		got, err := c.List(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := action
+		if action == "none" {
+			// Nothing is stored as an absent key, which is what a file that
+			// never mentions power looks like.
+			want = ""
+		}
+		if got.Inputs[1].Power != want {
+			t.Errorf("after %s, power = %q, want %q", action, got.Inputs[1].Power, want)
+		}
+	}
+}
+
+func TestAnUnknownActionIsRefused(t *testing.T) {
+	c := scratch(t, oneInput)
+	if res := c.SetPower(context.Background(), "dp", "hibernate"); res.Code == 0 {
+		t.Error("an action odisplay does not know was accepted")
+	}
+	s, _ := c.List(context.Background())
+	if s.Inputs[1].Power != "" {
+		t.Errorf("power = %q, want it left alone", s.Inputs[1].Power)
+	}
+}
