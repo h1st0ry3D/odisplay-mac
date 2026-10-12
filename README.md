@@ -84,14 +84,16 @@ worse than saying the machine did not sleep.
 
 Sleep works for the logged-in user. Shutdown needs root, and there is no way to ask for it from a
 menu bar item, so it goes through `sudo -n`, which fails at once instead of waiting on a password
-prompt nobody can reach. One line in `sudoers` makes it work, for that command only, added with
-`sudo visudo`:
+prompt nobody can reach. Nothing here can ever ask for one.
+
+One line in `sudoers` makes shutdown work, for that command only. `odisplay doctor` prints it with
+the path this Mac actually resolves, so it is ready to paste:
 
     yourname ALL=(root) NOPASSWD: /sbin/shutdown -h now
 
-A rule matches the path rather than the name, so take it from the command odisplay will run rather
-than from this page. `odisplay switch <input> --dry-run` prints the sequence, and the shutdown is
-its last line.
+The path matters: a rule matches the path rather than the name of the program, so a line naming a
+different one never fires. Add it with `sudo visudo`, or as a file of its own in `/etc/sudoers.d`.
+Nothing else is granted.
 
 The top line reports the last switch and is kept in one piece: `Sent Mac Mini, devices on host 3.`
 or, when it went wrong, why.
