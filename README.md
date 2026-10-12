@@ -82,12 +82,16 @@ A failure of the action is exit 5 rather than 3, because it is the only one wher
 mouse are where you wanted them. Sending someone to look for a keyboard that is not lost would be
 worse than saying the machine did not sleep.
 
-Sleep works for the logged-in user. Shutdown needs root and there is no way to ask for it from a
+Sleep works for the logged-in user. Shutdown needs root, and there is no way to ask for it from a
 menu bar item, so it goes through `sudo -n`, which fails at once instead of waiting on a password
 prompt nobody can reach. One line in `sudoers` makes it work, for that command only, added with
 `sudo visudo`:
 
     yourname ALL=(root) NOPASSWD: /sbin/shutdown -h now
+
+A rule matches the path rather than the name, so take it from the command odisplay will run rather
+than from this page. `odisplay switch <input> --dry-run` prints the sequence, and the shutdown is
+its last line.
 
 The top line reports the last switch and is kept in one piece: `Sent Mac Mini, devices on host 3.`
 or, when it went wrong, why.
