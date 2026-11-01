@@ -19,7 +19,7 @@ import (
 
 // asked is the part of odisplay's interface this app depends on: the settings
 // it reads and writes, in odisplay's own words.
-var asked = []string{"set name", "set host", "set display", "set hidden", "set power"}
+var asked = []string{"set name", "set host", "set display", "set hidden", "set power", "display"}
 
 // TestMain asks what odisplay can do before any test runs.
 //
@@ -561,6 +561,26 @@ func TestNewFindsTheBinaryItIsGiven(t *testing.T) {
 func TestAClientWithNoPathFailsRatherThanDoingNothing(t *testing.T) {
 	if _, err := (&Client{}).List(context.Background()); err == nil {
 		t.Error("a client with no path should fail rather than silently do nothing")
+	}
+}
+
+// The app's Turn Off Display item is one call with two words, and this is the
+// only place that argv is checked. The stub records it, because a test that ran
+// the real one would darken the screen it is running on.
+func TestDisplayOffIsOneCallWithTwoWords(t *testing.T) {
+	dir := t.TempDir()
+	stub := filepath.Join(dir, "odisplay")
+	if err := os.WriteFile(stub, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ODISPLAY_CONFIG", filepath.Join(dir, "odisplay.json"))
+	c := &Client{Path: stub}
+	res := c.DisplayOff(context.Background())
+	if res.Code != 0 {
+		t.Fatalf("code = %d (%s)", res.Code, res.Detail)
+	}
+	if res.Message != "display off" {
+		t.Errorf("argv = %q, want display off", res.Message)
 	}
 }
 

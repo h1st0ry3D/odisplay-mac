@@ -42,6 +42,9 @@ const (
 	// ActionSetDisplay records which display this machine switches. It only
 	// writes the setting; nothing moves until an input is switched to.
 	ActionSetDisplay
+	// ActionDisplayOff turns the monitor's own power off, leaving this Mac
+	// running and the keyboard and mouse where they are.
+	ActionDisplayOff
 	// ActionReload re-reads the settings, for after a hand edit.
 	ActionReload
 	// ActionQuit leaves.
@@ -445,6 +448,17 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 	}
 	displayItem.Title = displayItem.Title + ": " + strconv.Itoa(s.Display)
 	m.Items = append(m.Items, displayItem)
+
+	// One click, no submenu and no input: this is the monitor's own power, not
+	// what this Mac does after a switch. It sits beside Quit because it is the
+	// other thing done on the way out, and it leaves everything else running.
+	m.Items = append(m.Items, &Item{
+		Title:           "Turn Off Display",
+		Tooltip:         "Turn the monitor off and leave this Mac running",
+		Action:          ActionDisplayOff,
+		Disabled:        busy,
+		SeparatorBefore: true,
+	})
 
 	m.Items = append(m.Items, &Item{
 		Title:    "Quit",

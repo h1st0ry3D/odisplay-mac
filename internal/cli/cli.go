@@ -320,6 +320,15 @@ func (c *Client) Switch(ctx context.Context, key string) Result {
 	return res
 }
 
+// DisplayOff turns the monitor's own power off, leaving this Mac running.
+//
+// It is not SetPower: that decides what this Mac does after a switch, while
+// this leaves the Mac exactly where it is and darkens only the panel.
+func (c *Client) DisplayOff(ctx context.Context) Result {
+	res, _ := c.run(ctx, "display", "off")
+	return res
+}
+
 // SetHost sets an input's Easy-Switch channel.
 func (c *Client) SetHost(ctx context.Context, key, host string) Result {
 	res, _ := c.run(ctx, "set", "host", key, host)

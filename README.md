@@ -37,6 +37,7 @@ Hide
   PC                       ▸
 Display: 1                 ▸
 ──────────────────────────
+Turn Off Display
 Quit
 ```
 
@@ -65,13 +66,21 @@ The list is fixed because `m1ddc` numbers external displays from 1 and skips the
 that numbering is stable enough to offer. A number this machine does not have is refused when it is
 used, and the switch says so rather than appearing to work.
 
+Turn Off Display, above Quit, turns the monitor's own power off and leaves this Mac running, with
+the keyboard and mouse exactly where they are. It runs `odisplay display off`; the CLI owns which
+command does that on this platform. There is no confirmation, because the point of it is to darken
+the screen on the way out. The same command can be bound to a key, and `odisplay display on` is the
+way back where the monitor still answers DDC/CI. Many monitors stop answering while they are off,
+so the monitor's own power button is the surest way back.
+
 One block per input. The input's own name is the top item, and clicking it switches. The line
 under it opens the Easy-Switch channels, with a tick on the one that is in force, so you can see
 what a switch will do before you make one.
 
 Power is the second line of each block. A switch sends the keyboard and mouse, and this is what this
 Mac then does with itself: Awake leaves it running, Sleep suspends it, and Shutdown powers it off,
-with a tick on the one in force.
+with a tick on the one in force. This is not the same as Turn Off Display: that one leaves the Mac
+running and darkens only the monitor.
 
 It runs last, after the monitor and after every device, and only if all of them succeeded. Sleeping
 first would leave the display never moved and the keyboard and mouse still here, which is the one

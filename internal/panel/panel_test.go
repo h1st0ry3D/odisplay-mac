@@ -147,7 +147,7 @@ func TestSwitchingIsOneActionThatDecidesNothing(t *testing.T) {
 func TestBusyRefusesEveryAction(t *testing.T) {
 	m := Build(settings(), Idle, true)
 	for _, it := range m.Items {
-		if it.Action == ActionSwitch || it.Action == ActionSetHost {
+		if it.Action == ActionSwitch || it.Action == ActionSetHost || it.Action == ActionDisplayOff {
 			if !it.Disabled {
 				t.Errorf("%q is still clickable while busy", it.Title)
 			}
@@ -168,6 +168,29 @@ func TestQuitIsAlwaysAvailable(t *testing.T) {
 	}
 	if q.Disabled {
 		t.Error("Quit is disabled, so a failed switch could not be escaped")
+	}
+}
+
+// Turning the display off is one item and one call. It has no input, because it
+// is the monitor's own power rather than what a switch does, and no children,
+// because there is nothing left to choose once it has been clicked.
+func TestTurningTheDisplayOffIsOneItem(t *testing.T) {
+	m := Build(settings(), Idle, false)
+	item := find(m, "Turn Off Display")
+	if item == nil {
+		t.Fatalf("no Turn Off Display item:\n%s", m.Describe())
+	}
+	if item.Action != ActionDisplayOff {
+		t.Errorf("action = %v, want ActionDisplayOff", item.Action)
+	}
+	if len(item.Children) != 0 {
+		t.Errorf("the item carries %d children; turning the display off is one call", len(item.Children))
+	}
+	if item.Key != "" {
+		t.Errorf("key = %q, want none: the monitor has no input key", item.Key)
+	}
+	if item.Disabled {
+		t.Error("the item is disabled with nothing in flight")
 	}
 }
 
@@ -227,10 +250,10 @@ func TestSeparatorsFallBetweenInputs(t *testing.T) {
 			seps++
 		}
 	}
-	// One per input, plus one before the display picker. Not one per item,
-	// which would be a wall of lines.
-	if seps != 4 {
-		t.Errorf("separators = %d, want 4 (one per input, one before Display)", seps)
+	// One per input, plus one before the display picker and one before Turn
+	// Off Display. Not one per item, which would be a wall of lines.
+	if seps != 5 {
+		t.Errorf("separators = %d, want 5 (one per input, one before Display, one before Turn Off Display)", seps)
 	}
 }
 

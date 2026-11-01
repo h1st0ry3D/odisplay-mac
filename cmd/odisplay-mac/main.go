@@ -428,6 +428,11 @@ func (a *app) run(c call) {
 		a.setStatus(panel.ForSetting(res,
 			"Switching "+panel.DisplayTitle(settings.MonitorOr(), display)+" from now on."))
 
+	case panel.ActionDisplayOff:
+		log.Printf("turning the display off")
+		res := client.DisplayOff(ctx)
+		a.setStatus(panel.ForSetting(res, "Turned the display off."))
+
 	}
 
 	a.mu.Lock()
